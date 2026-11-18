@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -18,45 +18,45 @@
 <header class="topbar">
   <div class="sigil"><span></span></div>
   <div class="brandlock">
-    <div class="overline">Hermes Agent Direct Channel</div>
+    <div class="overline">Direktverbindung zu Hermes Agent</div>
     <div class="mega">JARVIS</div>
   </div>
   <div class="pills">
-    <div class="pill ok"><i></i><span id="top-gw">Gateway: probing</span></div>
-    <div class="pill"><i></i><span id="top-profile">Profile: default</span></div>
-    <div class="pill warn"><i></i><span id="top-voice">Voice: browser</span></div>
+    <div class="pill ok"><i></i><span id="top-gw">Verbindung wird geprüft</span></div>
+    <div class="pill"><i></i><span id="top-profile">Profil: Standard</span></div>
+    <div class="pill warn"><i></i><span id="top-voice">Sprache: Browser</span></div>
   </div>
 </header>
 
 <div class="hud">
   <section class="col left glass">
     <header class="colhead">
-      <div class="h">Command<br>Matrix</div>
-      <div class="sub">Click to execute · payload commands stay armed</div>
+      <div class="h">Befehls-<br>zentrale</div>
+      <div class="sub">Antippen zum Ausführen · Befehle mit Argumenten bleiben aktiviert</div>
     </header>
 
     <div class="cmds" id="cmds">
-      <button class="cmd" data-cmd="/new"><b>/new</b><span>Fresh thread</span></button>
-      <button class="cmd" data-cmd="/goal"><b>/goal</b><span>Standing objective</span></button>
-      <button class="cmd" data-cmd="/tools"><b>/tools</b><span>Hermes tool status</span></button>
-      <button class="cmd" data-cmd="/browser"><b>/browser</b><span>Chrome / browser op</span></button>
-      <button class="cmd" data-cmd="/background"><b>/background</b><span>Async mission</span></button>
-      <button class="cmd" data-cmd="/mission"><b>/mission</b><span>Mission queue</span></button>
-      <button class="cmd" data-cmd="/personality"><b>/personality</b><span>Voice/tone overlay</span></button>
-      <button class="cmd" data-cmd="/commands"><b>/commands</b><span>Show commands</span></button>
+      <button class="cmd" data-cmd="/new"><b>/new</b><span>Neues Gespräch</span></button>
+      <button class="cmd" data-cmd="/goal"><b>/goal</b><span>Dauerhaftes Ziel</span></button>
+      <button class="cmd" data-cmd="/tools"><b>/tools</b><span>Hermes-Werkzeuge</span></button>
+      <button class="cmd" data-cmd="/browser"><b>/browser</b><span>Browser-Aufgabe</span></button>
+      <button class="cmd" data-cmd="/background"><b>/background</b><span>Hintergrundauftrag</span></button>
+      <button class="cmd" data-cmd="/mission"><b>/mission</b><span>Auftragsliste</span></button>
+      <button class="cmd" data-cmd="/personality"><b>/personality</b><span>Tonfall ändern</span></button>
+      <button class="cmd" data-cmd="/commands"><b>/commands</b><span>Befehle anzeigen</span></button>
     </div>
 
     <div class="toolrack">
-      <div class="lbl">Connected Hermes Tools</div>
-      <div id="toolsList" class="chips"><span class="chip ghost">loading tool matrix…</span></div>
+      <div class="lbl">Verbundene Hermes-Werkzeuge</div>
+      <div id="toolsList" class="chips"><span class="chip ghost">Werkzeuge werden geladen …</span></div>
     </div>
 
     <div class="uplink">
-      <div class="lbl">Pending uplink</div>
+      <div class="lbl">Eingabe</div>
       <div class="field">
-        <textarea id="input" rows="4" spellcheck="false" placeholder="Speak through browser voice or type a Hermes instruction. Slash commands are supported."></textarea>
+        <textarea id="input" rows="4" spellcheck="false" placeholder="Sprich mit Jarvis oder gib eine Anweisung ein. Kurzbefehle mit / sind möglich."></textarea>
       </div>
-      <div class="tip" id="tip">Use <b>Browser Voice</b> for local speech recognition, or server ElevenLabs if configured. Try <b>/browser</b> “open Chrome and inspect the current tab”.</div>
+      <div class="tip" id="tip">Sprachsteuerung über die vorhandenen Hermes-Sprachdienste, wenn verfügbar, sonst über den Browser.</div>
     </div>
   </section>
 
@@ -83,53 +83,53 @@
         <circle class="orbrim" cx="260" cy="260" r="64"/>
       </svg>
       <div class="status">
-        <div class="stbrand">JARVIS CORE</div>
-        <div class="stword" id="stword">STANDBY</div>
-        <div class="strun" id="strun">awaiting uplink</div>
+        <div class="stbrand">JARVIS · KERN</div>
+        <div class="stword" id="stword">BEREIT</div>
+        <div class="strun" id="strun">warte auf Eingabe</div>
       </div>
     </div>
 
     <div class="response glass" id="responseWrap">
-      <div class="rhead"><span>JARVIS Response</span><span class="rtag" id="rtag">IDLE</span></div>
-      <div class="rbody" id="response"><span class="rplaceholder">Standing by. Transmit an instruction.</span></div>
+      <div class="rhead"><span>Antwort von JARVIS</span><span class="rtag" id="rtag">BEREIT</span></div>
+      <div class="rbody" id="response"><span class="rplaceholder">Bereit. Ich erwarte deine Anweisung.</span></div>
     </div>
 
     <div class="missionbar glass">
-      <button id="mic" class="ctl mic" title="Browser voice / microphone">◉ Browser Voice</button>
-      <button id="run" class="ctl run" title="Send (⌘↵)">Transmit to JARVIS ▸</button>
-      <button id="showCommands" class="ctl aux">Show Commands</button>
-      <button id="missionBtn" class="ctl aux">Mission Control</button>
-      <button id="mute" class="ctl mute on" title="Mute Jarvis speech">🔊</button>
-      <button id="clearBtn" class="ctl aux">Clear</button>
+      <button id="mic" class="ctl mic" title="Sprachgespräch starten oder beenden">◉ Sprachdialog</button>
+      <button id="run" class="ctl run" title="Senden (Strg/⌘ + Eingabe)">An Jarvis senden ▸</button>
+      <button id="showCommands" class="ctl aux">Befehle</button>
+      <button id="missionBtn" class="ctl aux">Aufträge</button>
+      <button id="mute" class="ctl mute on" title="Jarvis stummschalten">🔊</button>
+      <button id="clearBtn" class="ctl aux">Leeren</button>
     </div>
   </section>
 
   <section class="col right glass">
     <header class="colhead row">
-      <div class="h sm">Action Log</div>
-      <div class="live" id="live">LIVE TELEMETRY</div>
+      <div class="h sm">Ereignisprotokoll</div>
+      <div class="live" id="live">LIVE-STATUS</div>
     </header>
 
     <div class="sysgrid">
-      <div class="sysrow"><span>Gateway</span><b id="sy-gw" class="ok">online</b></div>
-      <div class="sysrow"><span>Brain</span><b id="sy-brain">—</b></div>
-      <div class="sysrow"><span>Voice</span><b id="sy-voice">—</b></div>
-      <div class="sysrow"><span>Profile</span><b id="sy-profile">default</b></div>
-      <div class="sysrow"><span>Runtime</span><b id="sy-runtime">—</b></div>
-      <div class="sysrow"><span>Uplink</span><b id="sy-clock">—</b></div>
+      <div class="sysrow"><span>Verbindung</span><b id="sy-gw" class="ok">online</b></div>
+      <div class="sysrow"><span>KI-Kern</span><b id="sy-brain">—</b></div>
+      <div class="sysrow"><span>Sprache</span><b id="sy-voice">—</b></div>
+      <div class="sysrow"><span>Profil</span><b id="sy-profile">default</b></div>
+      <div class="sysrow"><span>Laufzeit</span><b id="sy-runtime">—</b></div>
+      <div class="sysrow"><span>Uhrzeit</span><b id="sy-clock">—</b></div>
     </div>
 
     <div class="missionPanel">
-      <div class="log-lbl">Mission controls</div>
+      <div class="log-lbl">Schnellzugriff</div>
       <div class="miniBtns">
         <button data-quick="/status">Status</button>
-        <button data-quick="/tools">Tools</button>
-        <button data-quick="/toolsets">Toolsets</button>
-        <button data-quick="/connectors">Connectors</button>
+        <button data-quick="/tools">Werkzeuge</button>
+        <button data-quick="/toolsets">Werkzeugsätze</button>
+        <button data-quick="/connectors">Verbindungen</button>
       </div>
     </div>
 
-    <div class="log-lbl">Event stream</div>
+    <div class="log-lbl">Ereignisse</div>
     <div class="log" id="log"></div>
   </section>
 </div>
