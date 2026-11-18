@@ -22,7 +22,10 @@ _CLI_NOISE = re.compile(
 
 MODEL = os.environ.get("JARVIS_MODEL", "").strip()
 PROFILE = os.environ.get("HERMES_PROFILE", os.environ.get("JARVIS_PROFILE", "default")).strip() or "default"
-SOURCE = os.environ.get("HERMES_SOURCE", "jarvis-dashboard").strip() or "jarvis-dashboard"
+# Hermes akzeptiert bei session.create nur definierte Quellen.
+# Das Dashboard ist ein vom Nutzer bedienter lokaler Client: Quelle "cli".
+# Ein frei erfundenes "--source jarvis-dashboard" führt zu "invalid params".
+SOURCE = "cli"
 WORKDIR = os.path.expanduser(os.environ.get("JARVIS_WORKDIR", os.getcwd()))
 PERMISSION = os.environ.get("JARVIS_PERMISSION", os.environ.get("HERMES_PERMISSION", "normal")).strip().lower()
 RUNTIME = os.environ.get("JARVIS_RUNTIME", "auto").strip().lower()  # auto|hermes|mock
