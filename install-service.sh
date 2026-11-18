@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Einmalige Einrichtung des vorhandenen deutschen JARVIS-Dashboards als Benutzerdienst.
+# Einrichtung des vorhandenen deutschen JARVIS-Dashboards als Systemdienst.
 # Keine Aktualisierung oder Installation von Hermes, keine GitHub Actions.
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -25,12 +25,17 @@ if ! grep -q '^JARVIS_ACCESS_PASSWORD=' .env; then
 fi
 chmod 600 .env
 
-mkdir -p "$HOME/.config/systemd/user"
-cp jarvis-dashboard.service "$HOME/.config/systemd/user/jarvis-dashboard.service"
-systemctl --user daemon-reload
-systemctl --user enable --now jarvis-dashboard.service
+# Den fehlerhaften Versuch eines Benutzer-Dienstes aufraeumen.
+rm -f "$HOME/.config/systemd/user/jarvis-dashboard.service"
 
-printf '\nJARVIS ist als Benutzerdienst eingerichtet.\n'
+# Regulärer Systemdienst: funktioniert auch ohne DBUS_SESSION_BUS_ADDRESS.
+# Der eigentliche Jarvis-Prozess läuft ausdrücklich als Benutzer jarvis.
+sudo install -m 0644 jarvis-dashboard.service /etc/systemd/system/jarvis-dashboard.service
+sudo systemctl daemon-reload
+sudo systemctl enable jarvis-dashboard.service
+sudo systemctl restart jarvis-dashboard.service
+
+printf '\nJARVIS ist als Systemdienst unter dem Benutzer jarvis eingerichtet.\n'
 printf 'Browser im Heimnetz: http://192.168.51.102:8730\n'
 printf 'Benutzer: jarvis\n'
 printf 'Passwort (nur für dich, nicht im Chat teilen): '
