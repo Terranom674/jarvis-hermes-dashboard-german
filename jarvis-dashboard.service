@@ -10,7 +10,6 @@ ExecStart=/usr/bin/python3 %h/jarvis-hermes-dashboard-german/server.py
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 Restart=on-failure
 RestartSec=3
-NoNewPrivileges=true
 
 [Install]
 WantedBy=default.target
