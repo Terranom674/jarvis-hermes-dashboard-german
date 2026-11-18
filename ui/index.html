@@ -51,13 +51,6 @@
       <div id="toolsList" class="chips"><span class="chip ghost">Werkzeuge werden geladen …</span></div>
     </div>
 
-    <div class="uplink">
-      <div class="lbl">Eingabe</div>
-      <div class="field">
-        <textarea id="input" rows="4" spellcheck="false" placeholder="Sprich mit Jarvis oder gib eine Anweisung ein. Kurzbefehle mit / sind möglich."></textarea>
-      </div>
-      <div class="tip" id="tip">Sprachsteuerung über die vorhandenen Hermes-Sprachdienste, wenn verfügbar, sonst über den Browser.</div>
-    </div>
   </section>
 
   <section class="col center">
@@ -94,13 +87,29 @@
       <div class="rbody" id="response"><span class="rplaceholder">Bereit. Ich erwarte deine Anweisung.</span></div>
     </div>
 
+    <div class="uplink composer glass" id="composer">
+      <div class="composer-head">
+        <label for="input" class="lbl">Mit Jarvis sprechen</label>
+        <span class="composer-hint">Enter = Senden · Shift+Enter = Zeilenumbruch</span>
+      </div>
+      <div class="field composer-field">
+        <textarea id="input" rows="2" spellcheck="true" aria-label="Nachricht an Jarvis"
+          placeholder="Was möchtest du wissen oder erledigen lassen?"></textarea>
+        <div class="composer-buttons">
+          <button id="mic" class="ctl mic" title="Sprachgespräch starten oder beenden">◉ Sprechen</button>
+          <button id="run" class="ctl run" title="Nachricht an Jarvis senden">Senden ▸</button>
+        </div>
+      </div>
+      <div class="tip" id="tip">Du kannst direkt schreiben oder einen der Befehle links verwenden.</div>
+      <p class="voice-warning" id="voiceWarning" hidden>Das Mikrofon benötigt eine HTTPS-Verbindung. Die Texteingabe funktioniert bereits.</p>
+    </div>
+
     <div class="missionbar glass">
-      <button id="mic" class="ctl mic" title="Sprachgespräch starten oder beenden">◉ Sprachdialog</button>
-      <button id="run" class="ctl run" title="Senden (Strg/⌘ + Eingabe)">An Jarvis senden ▸</button>
       <button id="showCommands" class="ctl aux">Befehle</button>
       <button id="missionBtn" class="ctl aux">Aufträge</button>
       <button id="mute" class="ctl mute on" title="Jarvis stummschalten">🔊</button>
       <button id="clearBtn" class="ctl aux">Leeren</button>
+      <button id="logout" class="ctl aux" title="Auf diesem Gerät abmelden">Abmelden</button>
     </div>
   </section>
 
