@@ -15,7 +15,7 @@ Deutschsprachige Weiterentwicklung von [JARVIS Hermes Dashboard](https://github.
 - Deutsche Kurzbefehle zusätzlich zu den bisherigen englischen Befehlen
 - Anpassungen für Desktop, Tablet und Smartphone
 - Keine zweite KI, keine getrennten Hermes-Zugangsdaten
-- **Keine GitHub Actions, keine automatischen Prüfungen, keine CI/CD-Konfiguration**
+- **Keine GitHub Actions, keine CI/CD-Konfiguration; lediglich ein systemd-Dienst für den normalen Betrieb**
 
 ## Aufbau
 
@@ -44,19 +44,37 @@ Das Dashboard ruft **Hermes über die vorhandene CLI** auf. Es verbindet sich ni
 
 Diese Version benötigt **keine neue Hermes-Installation** und verändert keine vorhandenen Hermes-Konfigurationsdateien.
 
-## Installation
+## Dauerhaft im Jarvis-LXC 102 installieren
 
-Erst nach Prüfung der bestehenden Hermes-Installation auf dem Zielserver:
+Die Oberfläche läuft als **systemd-Benutzerdienst** und ist nach dem Start direkt auf jedem Gerät im Heimnetz per Browser erreichbar. Ein SSH-Tunnel ist für die Oberfläche nicht erforderlich.
+
+Für die bestehende lokale Installation einmal die aktuelle Version aus `main` übernehmen:
 
 ```bash
-git clone https://github.com/Terranom674/jarvis-hermes-dashboard-german.git
-cd jarvis-hermes-dashboard-german
-./install.sh
+cd ~/jarvis-hermes-dashboard-german && git pull --ff-only origin main && bash install-service.sh
 ```
 
-Das Startskript erzeugt eine private `.env`-Datei aus `.env.example`, sofern sie noch nicht existiert. Anschließend startet es den Python-Server. **Der Standardzugang ist lokal:** `http://127.0.0.1:8730`.
+Der Befehl übernimmt die neueste Hauptversion und richtet `jarvis-dashboard.service` ein. Das Skript ergänzt die vorhandene private `.env` nur um die fehlenden Netzwerk- und Zugangseinstellungen, ohne Hermes zu verändern.
 
-Falls das Repository bereits ausgecheckt ist, bestehende lokale Einstellungen sichern und vor Aktualisierungen prüfen. `.env` wird nicht im Repository gespeichert.
+Anschließend im Heimnetz auf PC, Tablet oder Smartphone öffnen:
+
+**http://192.168.51.102:8730**
+
+Der Browser verlangt Benutzername `jarvis` und ein individuell erzeugtes Kennwort. Das Installationsskript zeigt dieses einmal im Terminal an und speichert es in `.env` mit Zugriffsrechten nur für den jeweiligen Benutzer.
+
+Der Dienst nutzt die LAN-IP `192.168.51.102` und keinen zusätzlichen öffentlich freizugebenden Port. **Keine Portweiterleitung für 8730 ins Internet einrichten.** Da der erste LAN-Aufruf über HTTP erfolgt, ist er vorerst zur Anzeige und Texteingabe gedacht; für sichere Mikrofonfreigaben auf anderen Endgeräten muss die Oberfläche danach über die vorhandene HTTPS-Reverse-Proxy-Infrastruktur erreichbar sein. **HTTP-Basic-Anmeldedaten werden ohne HTTPS nicht verschlüsselt übertragen**; daher ist der unverschlüsselte Zugriff ausschließlich für ein vertrauenswürdiges Heimnetz vorgesehen.
+
+Bei einer späteren HTTPS-Einrichtung über Nginx Proxy Manager wird `JARVIS_PUBLIC_URL` in `.env` auf die tatsächliche HTTPS-Adresse umgestellt. Die Oberfläche akzeptiert diese Adresse dann als gültigen Host und Anfrageursprung. Ein zusätzlicher Passwortschutz bzw. die Access List des Reverse Proxy wird empfohlen.
+
+### Erster Checkout auf einem neuen Server
+
+```bash
+git clone --branch main --single-branch https://github.com/Terranom674/jarvis-hermes-dashboard-german.git
+cd jarvis-hermes-dashboard-german
+bash install-service.sh
+```
+
+`install.sh` bleibt für einen **manuellen Vordergrundstart nur auf localhost** erhalten; die dauerhaft installierte Version läuft über `install-service.sh`. Das bestehende Hermes bleibt unverändert.
 
 ### Browserzugang über einen SSH-Tunnel
 
