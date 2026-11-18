@@ -1,13 +1,9 @@
-"""
-JARVIS Live — a HUD that drives Hermes Agent.
+"""JARVIS-Kommandozentrale für den bestehenden Hermes Agent.
 
-    python3 server.py
-
-The brain is your own Hermes Agent CLI/profile. Hermes keeps access to the same
-configured tools, browser/Chrome automation, MCP servers, skills, memory, and
-third-party integrations that your normal Hermes sessions have. Voice can use the
-browser Web Speech API, with optional server-side ElevenLabs STT/TTS if present.
+Verwendet das vorhandene Hermes-Profil mit Gedächtnis, Skills und Werkzeugen.
+Die Sprachdienste werden bevorzugt direkt aus der Hermes-Konfiguration geladen.
 """
+
 import json
 import mimetypes
 import os
@@ -22,7 +18,7 @@ from urllib.parse import urlparse
 ROOT = pathlib.Path(__file__).resolve().parent
 UI = ROOT / "ui"
 
-# load .env before importing anything that reads os.environ
+# Lokale Konfiguration vor dem Import der Komponenten einlesen.
 _env = ROOT / ".env"
 if _env.exists():
     for line in _env.read_text(encoding="utf-8").splitlines():
@@ -37,9 +33,14 @@ import voice            # noqa: E402
 import hermes_audio     # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8730"))
-# Uses Hermes' configured STT/TTS when installed; ElevenLabs/browser remain optional.
+# Hermes-STT/TTS bevorzugen; Browser/ElevenLabs bleiben optionale Alternativen.
 AUDIO_BACKEND = os.environ.get("JARVIS_AUDIO_BACKEND", "auto").strip().lower()
+if AUDIO_BACKEND not in ("auto", "hermes", "browser", "elevenlabs"):
+    raise ValueError("Ungültiges JARVIS_AUDIO_BACKEND: auto, hermes, browser oder elevenlabs auswählen.")
 HERMES_AUDIO = AUDIO_BACKEND in ("auto", "hermes") and hermes_audio.available()
+if AUDIO_BACKEND == "hermes" and not HERMES_AUDIO:
+    raise RuntimeError("Hermes-Sprachumgebung nicht gefunden. "
+                       "JARVIS_HERMES_SOURCE oder JARVIS_HERMES_PYTHON prüfen.")
 SPEECH_BACKEND = ("hermes" if HERMES_AUDIO else
                   "browser" if AUDIO_BACKEND == "browser" else
                   "elevenlabs" if voice.available() and AUDIO_BACKEND in ("auto", "elevenlabs") else
@@ -49,9 +50,7 @@ RUN_LOCK = threading.Lock()
 MAX_JSON_BODY = 1024 * 1024
 MAX_AUDIO_BODY = 12 * 1024 * 1024
 
-# The Jarvis persona, appended to every run. Without it, the model answers as a
-# coding agent and narrates its own tooling — which is not what you want spoken
-# out loud. Edit persona.md to change how it talks.
+# Sprachstil nur als Ergänzung des vorhandenen Hermes-Profils.
 _PERSONA_FILE = ROOT / "persona.md"
 
 
@@ -62,7 +61,7 @@ def persona():
         base = ""
     extra = commands.context_block()      # profile / goal / personality / queue
     return "\n\n".join(x for x in (base, extra) if x)
-# One continuing Hermes conversation until the user hits /new.
+# Fortlaufendes Gespräch bis /neu beziehungsweise /new.
 SESSION = {"id": None}
 
 
@@ -94,7 +93,7 @@ class Handler(BaseHTTPRequestHandler):
     def _read(self, limit):
         n = int(self.headers.get("Content-Length", 0))
         if n < 0 or n > limit:
-            raise ValueError(f"request body exceeds {limit} bytes")
+            raise ValueError(f"Anfrage überschreitet {limit} Byte.")
         return self.rfile.read(n) if n else b""
 
     def _host_ok(self):
@@ -114,7 +113,7 @@ class Handler(BaseHTTPRequestHandler):
     # ── GET ──────────────────────────────────────────────────
     def do_GET(self):
         if not self._host_ok():
-            return self._json({"error": "invalid host"}, 403)
+            return self._json({"error": "Ungültiger Hostname."}, 403)
         p = urlparse(self.path).path
         if p == "/api/status":
             return self._json(dict(
@@ -123,7 +122,7 @@ class Handler(BaseHTTPRequestHandler):
                 profile=runtime.PROFILE,
                 source=runtime.SOURCE,
                 workdir=runtime.WORKDIR,
-                model=runtime.MODEL or "Hermes default",
+                model=runtime.MODEL or "Hermes-Standardmodell",
                 tools=runtime.hermes_tools_snapshot(),
                 browser_stt=True,
                 browser_tts=True,
@@ -134,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
                 session=SESSION["id"]))
         if p == "/api/jobs":
             if not self._token_ok():
-                return self._json({"error": "unauthorized"}, 401)
+                return self._json({"error": "Keine Berechtigung."}, 401)
             # finished background missions, reported once each
             return self._json(dict(done=commands.take_finished(),
                                    running=[j for j in commands.jobs_snapshot()
@@ -143,7 +142,7 @@ class Handler(BaseHTTPRequestHandler):
         rel = "index.html" if p == "/" else p.lstrip("/")
         f = (UI / rel).resolve()
         if not str(f).startswith(str(UI.resolve())) or not f.is_file():
-            return self._bytes(b"not found", "text/plain", 404)
+            return self._bytes("Nicht gefunden".encode("utf-8"), "text/plain; charset=utf-8", 404)
         ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
         data = f.read_bytes()
         if rel == "index.html":
@@ -154,18 +153,18 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
         p = urlparse(self.path).path
         if not self._host_ok() or not self._origin_ok():
-            return self._json({"error": "request origin rejected"}, 403)
+            return self._json({"error": "Anfrageursprung abgewiesen."}, 403)
         if not self._token_ok():
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
         if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel"} and ctype != "application/json":
-            return self._json({"error": "application/json required"}, 415)
+            return self._json({"error": "JSON-Daten werden benötigt."}, 415)
         if p == "/api/listen" and not ctype.startswith("audio/"):
-            return self._json({"error": "audio content type required"}, 415)
+            return self._json({"error": "Eine Audioaufnahme wird benötigt."}, 415)
         try:
             raw = self._read(MAX_AUDIO_BODY if p == "/api/listen" else MAX_JSON_BODY)
         except (TypeError, ValueError):
-            return self._json({"error": "request body too large"}, 413)
+            return self._json({"error": "Die Anfrage ist zu groß."}, 413)
 
         if p == "/api/speak":
             try:
@@ -201,26 +200,26 @@ class Handler(BaseHTTPRequestHandler):
 
         if p == "/api/run":
             if not RUN_LOCK.acquire(blocking=False):
-                return self._json({"error": "JARVIS is already processing a request"}, 409)
+                return self._json({"error": "JARVIS bearbeitet bereits einen anderen Auftrag."}, 409)
             try:
                 return self._stream_run(raw)
             finally:
                 RUN_LOCK.release()
 
-        return self._json({"error": "no such endpoint"}, 404)
+        return self._json({"error": "Unbekannte Schnittstelle."}, 404)
 
     # ── the run: NDJSON stream of events ─────────────────────
     def _stream_run(self, raw):
         try:
             payload = json.loads(raw or b"{}")
         except json.JSONDecodeError:
-            return self._json({"error": "bad json"}, 400)
+            return self._json({"error": "Ungültige JSON-Daten."}, 400)
         message = (payload.get("message") or "").strip()
         extra = (payload.get("system") or "").strip()
         system = "\n\n".join(x for x in (persona(), extra) if x) or None
         fresh = bool(payload.get("fresh"))
         if not message:
-            return self._json({"error": "empty message"}, 400)
+            return self._json({"error": "Die Anweisung ist leer."}, 400)
         if fresh:
             SESSION["id"] = None
 
@@ -245,7 +244,7 @@ class Handler(BaseHTTPRequestHandler):
                 SESSION["id"] = None
             if cmd.get("message") is None:
                 # answered locally — no model call needed
-                emit(dict(t="delta", text=cmd.get("reply", "Done.")))
+                emit(dict(t="delta", text=cmd.get("reply", "Erledigt.")))
                 emit(dict(t="complete", ms=0))
                 return
             message = cmd["message"]
@@ -274,32 +273,29 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     kind = runtime.runtime_kind()
-    brain = ("Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
-             if kind == "hermes" else "MOCK — Hermes CLI not reachable")
-    vo = ("Hermes STT/TTS" if HERMES_AUDIO else
-          (f"ElevenLabs · {voice.voice_id()[:8]}…" if voice.available() else "Browser STT/TTS"))
-    perm = runtime.PERMISSION
-    perm_note = ("  can run tools without asking — set JARVIS_PERMISSION=default to require approval"
-                 if perm == "bypass" else "")
-
+    brain = ("Hermes Agent mit dem vorhandenen Profil verbunden."
+             if kind == "hermes" else "Hermes-CLI nicht erreichbar.")
+    voice_name = ("Hermes-Sprachdienste" if HERMES_AUDIO else
+                  "ElevenLabs" if SPEECH_BACKEND == "elevenlabs"
+                  else "Browser-Spracherkennung und Browserstimme")
     print(f"""
-  JARVIS · Hermes Live HUD
-  ──────────────────────────────────────────────
-  brain        {brain}
-  profile      {runtime.PROFILE}
-  workdir      {runtime.WORKDIR}
-  permission   {perm}{perm_note}
-  voice        {vo} + browser Web Speech fallback
-  open         http://localhost:{PORT}
+  JARVIS · Hermes-Kommandozentrale
+  -------------------------------------------
+  KI-Kern:        {brain}
+  Profil:         {runtime.PROFILE}
+  Arbeitsordner:  {runtime.WORKDIR}
+  Sprachmodus:    {voice_name}
+  Zugang:         http://127.0.0.1:{PORT}
+  Netzwerk:       Nur localhost (kein öffentlicher Zugriff)
 """, flush=True)
 
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
-    if os.environ.get("JARVIS_OPEN", "1") != "0":
-        webbrowser.open(f"http://localhost:{PORT}")
+    if os.environ.get("JARVIS_OPEN", "0") != "0":
+        webbrowser.open(f"http://127.0.0.1:{PORT}")
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
-        print("\n  down.")
+        print("\nJARVIS wurde beendet.")
         srv.shutdown()
 
 
