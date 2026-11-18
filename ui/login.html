@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>JARVIS · Anmeldung</title>
+<link rel="stylesheet" href="/login.css">
+<script src="/login.js" defer></script>
+</head>
+<body>
+<div class="grid" aria-hidden="true"></div>
+<main class="card">
+  <div class="orbit" aria-hidden="true">
+    <div class="orbit-inner"></div>
+    <span class="orbit-core"></span>
+  </div>
+  <div class="eyebrow">HERMES AGENT · PRIVATE KONSOLE</div>
+  <h1>JARVIS</h1>
+  <p class="intro">Willkommen zurück. Deine Kommandozentrale ist bereit.</p>
+  <form id="login-form">
+    <label for="password">Zugangspasswort</label>
+    <div class="password-field">
+      <input id="password" type="password" name="password" required
+             autocomplete="current-password" placeholder="Passwort eingeben" autofocus>
+      <button type="button" id="visibility" aria-label="Passwort einblenden" aria-pressed="false">Anzeigen</button>
+    </div>
+    <button id="login-button" type="submit">Kommandozentrale öffnen <span aria-hidden="true">↗</span></button>
+    <p class="error" id="error" role="alert" aria-live="polite"></p>
+  </form>
+  <p class="detail">Nur das Passwort. Kein Benutzername, kein Browser-Popup. Dieses Gerät bleibt nach der Anmeldung 30 Tage angemeldet.</p>
+  <p class="warning" id="connection-note" hidden>Diese Verbindung verwendet noch HTTP. Für geschützte Anmeldung und Sprachsteuerung benötigen wir HTTPS über den bestehenden Reverse Proxy.</p>
+</main>
+<footer>JARVIS · HERMES MISSION CONTROL</footer>
+</body>
+</html>
