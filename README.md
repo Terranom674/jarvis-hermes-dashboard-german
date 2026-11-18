@@ -46,7 +46,7 @@ Diese Version benötigt **keine neue Hermes-Installation** und verändert keine 
 
 ## Dauerhaft im Jarvis-LXC 102 installieren
 
-Die Oberfläche läuft als **systemd-Benutzerdienst** und ist nach dem Start direkt auf jedem Gerät im Heimnetz per Browser erreichbar. Ein SSH-Tunnel ist für die Oberfläche nicht erforderlich.
+Die Oberfläche läuft als **regulärer systemd-Systemdienst unter dem Benutzer `jarvis`** und ist nach dem Start direkt auf jedem Gerät im Heimnetz per Browser erreichbar. Sie benötigt keinen Systemd-Benutzersitzungsbus. Ein SSH-Tunnel ist für die Oberfläche nicht erforderlich.
 
 Für die bestehende lokale Installation einmal die aktuelle Version aus `main` übernehmen:
 
@@ -54,7 +54,7 @@ Für die bestehende lokale Installation einmal die aktuelle Version aus `main` �
 cd ~/jarvis-hermes-dashboard-german && git pull --ff-only origin main && bash install-service.sh
 ```
 
-Der Befehl übernimmt die neueste Hauptversion und richtet `jarvis-dashboard.service` ein. Das Skript ergänzt die vorhandene private `.env` nur um die fehlenden Netzwerk- und Zugangseinstellungen, ohne Hermes zu verändern.
+Der Befehl übernimmt die neueste Hauptversion und richtet `jarvis-dashboard.service` in `/etc/systemd/system/` ein. Das Skript ergänzt die vorhandene private `.env` nur um die fehlenden Netzwerk- und Zugangseinstellungen, ohne Hermes zu verändern.
 
 Anschließend im Heimnetz auf PC, Tablet oder Smartphone öffnen:
 
