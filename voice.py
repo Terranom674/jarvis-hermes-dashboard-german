@@ -68,7 +68,7 @@ def transcribe(audio, mime="audio/webm"):
 
     body = b"".join([
         b"--", b, b"\r\n",
-        b'Content-Disposition: form-data; name="model_id"\r\n\r\nscribe_v1\r\n',
+        b'Content-Disposition: form-data; name="model_id"\r\n\r\nscribe_v2\r\n',
         b"--", b, b"\r\n",
         b'Content-Disposition: form-data; name="language_code"\r\n\r\nde\r\n',
         b"--", b, b"\r\n",
