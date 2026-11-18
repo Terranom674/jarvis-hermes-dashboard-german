@@ -9,7 +9,7 @@ const speechSynth = window.speechSynthesis;
 const API_TOKEN = document.querySelector('meta[name="jarvis-token"]')?.content || '';
 const apiHeaders = extra => ({'x-jarvis-token': API_TOKEN, ...(extra || {})});
 
-// ── reactor ticks ──
+// ── Reaktormarkierungen ──
 (() => {
   const g = $('#ticks480');
   for (let i = 0; i < 128; i++){
@@ -28,7 +28,7 @@ const rid = () => 'run_' + (crypto.randomUUID ? crypto.randomUUID().replace(/-/g
                                               : Math.random().toString(16).slice(2,14));
 const esc = s => String(s ?? '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 
-// ── reactor state ──
+// ── Reaktorstatus ──
 function setState(cls, word, sub){
   document.body.className = cls;
   if (word) $('#stword').textContent = word;
@@ -36,7 +36,7 @@ function setState(cls, word, sub){
 }
 function setTag(cls, text){ const t=$('#rtag'); t.className='rtag '+cls; t.textContent=text; }
 
-// ── action log ──
+// ── Ereignisprotokoll ──
 function log(kind, label, msg, jsonHtml){
   const e = document.createElement('div');
   e.className = 'entry k-' + kind;
@@ -54,7 +54,7 @@ function usageBlock(u){
           row('Token gesamt', u.total_tokens)].join(' · ');
 }
 
-// ── the run ──
+// ── Hermes-Anfrage ──
 let running = false, answer = '', firstDelta = false, speakThisRun = true;
 let speakDone = Promise.resolve(), activeController = null;
 
@@ -128,7 +128,7 @@ function handle(ev){
       log('status', 'STATUS', msg);
       break;
     case 'latency':
-      log('latency', 'LATENCY', `Erste Antwort nach ${ev.ms} ms`);
+      log('latency', 'VERZÖGERUNG', `Erste Antwort nach ${ev.ms} ms`);
       break;
     case 'tool':
       if (ev.phase === 'use')
@@ -148,7 +148,7 @@ function handle(ev){
       log('status', 'FERTIG', 'Auftrag abgeschlossen', usageBlock(ev));
       break;
     case 'complete':
-      setState('done', 'FERTIG', (ev.ms!=null?`${ev.ms}ms`:'') );
+      setState('done', 'FERTIG', (ev.ms!=null?`${ev.ms} ms`:'') );
       setTag('done', 'FERTIG');
       log('complete', 'FERTIG', ev.ms!=null?`Abgeschlossen nach ${ev.ms} ms`:'Auftrag abgeschlossen');
       renderAnswer(true);
@@ -203,7 +203,7 @@ let vad=null, spoke=false, loudAt=0, turnStart=0;
 let floorSum=0, floorN=0, threshold=0.02, peak=0, calibrating=true;
 const SILENCE=900, MIN_TURN_MS=350, MAX_TURN_MS=18000, NO_SPEECH_MS=10000;
 
-// ── voice out ──
+// ── Sprachausgabe ──
 let muted = false, player = null;
 function speak(text){
   return new Promise(resolve => {
@@ -249,7 +249,7 @@ function speak(text){
   });
 }
 
-// ── start / stop the whole conversation ──
+// ── Sprachgespräch starten und beenden ──
 async function micToggle(){
   if (convo){ stopConvo(); return; }
   // Prefer ElevenLabs server-side STT when configured. Browser STT is unreliable
@@ -302,7 +302,7 @@ function stopConvo(){
   setState('', 'BEREIT', 'warte auf Eingabe');
 }
 
-// ── browser speech turn ──
+// ── deutsche Spracherkennung im Browser ──
 function startBrowserRecognition(){
   if (!convo || suppress || !SpeechRecognition) return;
   recognition = new SpeechRecognition();
@@ -344,7 +344,7 @@ function startBrowserRecognition(){
   try{ recognition.start(); }catch(e){ log('error','SPRACHE','Spracherkennung konnte nicht gestartet werden'); }
 }
 
-// ── one server-side ElevenLabs listening turn ──
+// ── Aufnahme für Hermes oder den optionalen ElevenLabs-Dienst ──
 function beginTurn(){
   if (!convo || suppress || !micStream) return;
   chunks = []; spoke = false; peak = 0;
@@ -435,7 +435,7 @@ async function ship(){
     const armed = $('#input').dataset.cmd || '';
     const full = (armed ? armed + ' ' : '') + text;
     $('#input').value = ''; disarm();
-    log('send','SEND',`auto-sent voice: ${full}`);
+    log('send','GESENDET',`Gesprochene Anweisung: ${full}`);
     await transmit(full);                       // runs, then speaks; both with mic deaf
     // turn's done — hand the floor back and listen again
     suppress = false;
@@ -447,7 +447,7 @@ async function ship(){
   }
 }
 
-// ══════════ command matrix ══════════
+// ══════════ Befehlszentrale ══════════
 function disarm(){
   document.querySelectorAll('.cmd').forEach(c=>c.classList.remove('armed'));
   $('#input').dataset.cmd = '';
@@ -490,7 +490,7 @@ const TIPS = {
 };
 let defaultTip = '';
 
-// ══════════ controls ══════════
+// ══════════ Bedienelemente ══════════
 function sendFromInput(){
   const armed = $('#input').dataset.cmd || '';
   const raw = $('#input').value.trim();
@@ -531,10 +531,10 @@ function sys(id, val, cls){
   const el = $('#sy-' + id); if (!el) return;
   el.textContent = val; if (cls != null) el.className = cls;
 }
-// live clock in the system panel
+// Uhrzeit im Statusbereich aktualisieren
 setInterval(() => sys('clock', now()), 1000);
 
-// poll for finished /background missions and report them when they land
+// Abgeschlossene Hintergrundaufträge in der Oberfläche melden
 setInterval(async () => {
   try {
     const j = await fetch('/api/jobs', {headers:apiHeaders()}).then(r => r.json());
@@ -545,7 +545,7 @@ setInterval(async () => {
   } catch(_){}
 }, 4000);
 
-// ══════════ boot ══════════
+// ══════════ Start der Oberfläche ══════════
 (async () => {
   defaultTip = $('#tip').textContent;
   try {
@@ -571,7 +571,7 @@ setInterval(async () => {
 
     log('status', 'START',
         `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigung: ${s.permission}`);
-    log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${s.stt}, Ausgabe: ${s.tts}`);
+    log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${label(s.stt)}, Ausgabe: ${label(s.tts)}`);
     $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprachdialog');
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
