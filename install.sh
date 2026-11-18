@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
 cd "$(dirname "$0")"
+export PATH="$HOME/.local/bin:/usr/local/bin:$PATH"
 
 if ! command -v python3 >/dev/null 2>&1; then
-  printf 'Python 3 is required but was not found.\n' >&2
+  printf 'Python 3 wurde nicht gefunden.\n' >&2
   exit 1
 fi
 
+# Sensible Zugangsdaten sollen nicht in einer allgemein lesbaren Datei landen.
+umask 077
 if [ ! -f .env ]; then
   cp .env.example .env
-  printf 'Created private .env from .env.example.\n'
+  printf 'Lokale Konfiguration .env wurde aus der Vorlage angelegt.\n'
 fi
 
-# Read only the HERMES_CMD setting needed for this prerequisite check. The
-# Python server loads the rest of .env itself; this script never evaluates it.
+# Nur prüfen, nicht die bestehende Hermes-Installation verändern.
 configured_hermes="${HERMES_CMD:-}"
 if [ -z "$configured_hermes" ]; then
   while IFS='=' read -r key value; do
@@ -27,15 +28,11 @@ if [ -z "$configured_hermes" ]; then
 fi
 
 if ! command -v hermes >/dev/null 2>&1 && [ -z "$configured_hermes" ]; then
-  cat >&2 <<'EOF'
-Hermes Agent is required but was not found.
-Install it from https://hermes-agent.nousresearch.com/docs/ or set HERMES_CMD in .env.
-EOF
+  printf 'Hermes Agent wurde nicht gefunden. Bitte die vorhandene Installation oder HERMES_CMD prüfen.\n' >&2
   exit 1
 fi
 
 chmod +x start.sh install.sh
-
-printf '\nJARVIS is ready. Launching with the configured Hermes profile.\n'
-printf "Dashboard: http://127.0.0.1:${JARVIS_PORT:-8730}\n\n"
+printf '\nJARVIS-Kommandozentrale wird mit dem bestehenden Hermes-Profil gestartet.\n'
+printf 'Lokaler Zugang: http://127.0.0.1:8730\n\n'
 exec ./start.sh
