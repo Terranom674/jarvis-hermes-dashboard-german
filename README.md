@@ -81,7 +81,7 @@ JARVIS_HERMES_SOURCE=~/.hermes/hermes-agent
 
 | Wert | Bedeutung |
 |---|---|
-| `auto` | Bereits installierte Hermes-Sprachdienste bevorzugen; andernfalls ElevenLabs (nur bei gesetztem Schlüssel) oder Browser |
+| `auto` | Bereits installierte Hermes-Sprachdienste bevorzugen; andernfalls Browser – **niemals automatisch zu ElevenLabs wechseln** |
 | `hermes` | Hermes zwingend verwenden; bei fehlender Umgebung verständlichen Fehler anzeigen |
 | `browser` | Spracheingabe im Browser (`de-DE`) und deutsche Browserstimme, soweit verfügbar |
 | `elevenlabs` | Optionaler externer Dienst; benötigt separat eingerichteten API-Schlüssel |
