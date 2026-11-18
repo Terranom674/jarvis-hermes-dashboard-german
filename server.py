@@ -40,7 +40,10 @@ PORT = int(os.environ.get("JARVIS_PORT", "8730"))
 # Uses Hermes' configured STT/TTS when installed; ElevenLabs/browser remain optional.
 AUDIO_BACKEND = os.environ.get("JARVIS_AUDIO_BACKEND", "auto").strip().lower()
 HERMES_AUDIO = AUDIO_BACKEND in ("auto", "hermes") and hermes_audio.available()
-SPEECH_BACKEND = "hermes" if HERMES_AUDIO else ("elevenlabs" if voice.available() else "browser")
+SPEECH_BACKEND = ("hermes" if HERMES_AUDIO else
+                  "browser" if AUDIO_BACKEND == "browser" else
+                  "elevenlabs" if voice.available() and AUDIO_BACKEND in ("auto", "elevenlabs") else
+                  "browser")
 API_TOKEN = secrets.token_urlsafe(32)
 RUN_LOCK = threading.Lock()
 MAX_JSON_BODY = 1024 * 1024
@@ -167,6 +170,8 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/speak":
             try:
                 text = (json.loads(raw or b"{}").get("text") or "").strip()
+                if SPEECH_BACKEND == "browser":
+                    return self._json({"error": "Browser-Sprachausgabe erfolgt lokal im Browser."}, 400)
                 if HERMES_AUDIO:
                     audio, mime = hermes_audio.speak(text)
                     return self._bytes(audio, mime)
@@ -177,6 +182,8 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/listen":
             try:
                 mime = self.headers.get("Content-Type", "audio/webm")
+                if SPEECH_BACKEND == "browser":
+                    return self._json({"error": "Browser-Spracherkennung erfolgt lokal im Browser."}, 400)
                 transcript = hermes_audio.transcribe(raw, mime) if HERMES_AUDIO else voice.transcribe(raw, mime)
                 return self._json({"text": transcript})
             except Exception as e:                        # noqa: BLE001
