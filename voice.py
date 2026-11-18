@@ -1,18 +1,16 @@
-"""
-Text to speech.
+"""Optionaler ElevenLabs-Sprachdienst.
 
-ElevenLabs when a key is present, browser speechSynthesis otherwise.
-
-The key stays here, server-side. The browser asks /api/speak for audio and gets
-mp3 bytes back — it never sees the key, so nothing leaks into devtools, the
-page source, or a screen recording.
+Nur mit einem bewusst eingetragenen API-Schlüssel aktiv.
+Der Standard ist die vorhandene Hermes-Spracherkennung und -Sprachausgabe.
+Zugangsdaten bleiben serverseitig.
 """
+
 import json
 import os
 import urllib.error
 import urllib.request
 
-# Rachel — calm, British-adjacent. Override with ELEVENLABS_VOICE_ID.
+# Standardstimme des optionalen Dienstes, über ELEVENLABS_VOICE_ID änderbar.
 DEFAULT_VOICE = "21m00Tcm4TlvDq8ikWAM"
 MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_turbo_v2_5")
 
@@ -26,12 +24,12 @@ def voice_id():
 
 
 def speak(text):
-    """Returns mp3 bytes, or raises. Caller decides what to do on failure."""
+    """MP3-Audiodaten ausgeben oder einen Fehler melden."""
     if not available():
-        raise RuntimeError("no ELEVENLABS_API_KEY")
+        raise RuntimeError("ElevenLabs-API-Schlüssel ist nicht eingerichtet.")
     text = (text or "").strip()
     if not text:
-        raise ValueError("empty text")
+        raise ValueError("Kein Text für die Sprachausgabe.")
 
     req = urllib.request.Request(
         f"https://api.elevenlabs.io/v1/text-to-speech/{voice_id()}",
@@ -39,7 +37,7 @@ def speak(text):
             "text": text[:2500],
             "model_id": MODEL,
             "voice_settings": {
-                "stability": 0.42,          # a little variation; 0.5+ goes flat
+                "stability": 0.42,          # Natürliche Sprechvariation
                 "similarity_boost": 0.85,
                 "style": 0.25,
                 "use_speaker_boost": True,
@@ -57,16 +55,11 @@ def speak(text):
 
 
 def transcribe(audio, mime="audio/webm"):
-    """Speech to text via ElevenLabs Scribe. Returns the transcript, or raises.
-
-    Used instead of the browser's Web Speech API because that one only exists in
-    Chrome and is a silently-failing stub in Brave — and because it ships your
-    audio to Google. This keeps listening on the same provider as speaking.
-    """
+    """Deutsche Spracheingabe über den optionalen ElevenLabs-Scribe-Dienst."""
     if not available():
-        raise RuntimeError("no ELEVENLABS_API_KEY")
+        raise RuntimeError("ElevenLabs-API-Schlüssel ist nicht eingerichtet.")
     if not audio:
-        raise ValueError("empty audio")
+        raise ValueError("Leere Audioaufnahme.")
 
     ext = {"audio/webm": "webm", "audio/ogg": "ogg", "audio/mp4": "mp4",
            "audio/mpeg": "mp3", "audio/wav": "wav"}.get(mime.split(";")[0], "webm")
@@ -76,6 +69,8 @@ def transcribe(audio, mime="audio/webm"):
     body = b"".join([
         b"--", b, b"\r\n",
         b'Content-Disposition: form-data; name="model_id"\r\n\r\nscribe_v1\r\n',
+        b"--", b, b"\r\n",
+        b'Content-Disposition: form-data; name="language_code"\r\n\r\nde\r\n',
         b"--", b, b"\r\n",
         f'Content-Disposition: form-data; name="file"; filename="turn.{ext}"\r\n'.encode(),
         f"Content-Type: {mime}\r\n\r\n".encode(),
@@ -96,7 +91,7 @@ def transcribe(audio, mime="audio/webm"):
 
 
 def voices():
-    """List the account's voices, so you can find an id to put in .env."""
+    """Verfügbare Stimmen des optionalen ElevenLabs-Kontos abrufen."""
     if not available():
         return []
     req = urllib.request.Request(
