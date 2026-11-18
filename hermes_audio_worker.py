@@ -1,8 +1,9 @@
-"""Run STT/TTS inside the official Hermes Python environment.
+"""Sprachverarbeitung in der bereits eingerichteten Hermes-Python-Umgebung.
 
-Entrypoints are the same provider functions that Hermes' own web audio API uses.
-This worker intentionally never changes Hermes settings.
+Verwendet dieselben Provider wie die offizielle Hermes-Weboberfläche.
+Ändert weder Modelle noch Zugangsdaten oder Hermes-Einstellungen.
 """
+
 import base64
 import json
 import mimetypes
@@ -38,18 +39,18 @@ def main():
             return 1
         file_path = result.get("file_path")
         if not file_path:
-            raise RuntimeError("Hermes hat keinen Audiopfad geliefert")
+            raise RuntimeError("Hermes hat keine Audiodatei geliefert.")
         path = Path(file_path)
         try:
             audio = path.read_bytes()
         finally:
-            # Hermes creates a temporary TTS file; discard it after reading.
+            # Die von Hermes erzeugte temporäre Audiodatei nach dem Lesen entfernen.
             path.unlink(missing_ok=True)
         mime = mimetypes.guess_type(str(path))[0] or "audio/mpeg"
         _print({"ok": True, "audio": base64.b64encode(audio).decode("ascii"), "mime": mime})
         return 0
     except Exception as exc:
-        # Deliberately avoid traceback/details that might contain user secrets.
+        # Keine Rückgabe von Tracebacks, Zugangsdaten oder privaten Nutzerinformationen.
         _print({"ok": False, "error": type(exc).__name__})
         return 1
 
