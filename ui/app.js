@@ -64,7 +64,7 @@ async function transmit(message, options = {}){
   if (!message.trim()) return;
   if (running){
     // don't silently swallow it — say so, so it never looks like nothing happened
-    log('note','BUSY',`still working — "${message.slice(0,40)}" not sent. Wait, or press Esc to cancel.`);
+    log('note','BUSY',`Jarvis arbeitet noch – "${message.slice(0,40)}" wurde nicht gesendet. Esc zum Abbrechen.`);
     return;
   }
   running = true; answer = ''; firstDelta = false; speakThisRun = options.speak !== false;
@@ -90,7 +90,7 @@ async function transmit(message, options = {}){
       method:'POST', headers:apiHeaders({'content-type':'application/json'}),
       body: JSON.stringify({message, fresh}), signal:activeController.signal
     });
-    if (!res.ok) throw new Error(`backend returned HTTP ${res.status}`);
+    if (!res.ok) throw new Error(`Server meldet HTTP ${res.status}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = '';
@@ -107,12 +107,12 @@ async function transmit(message, options = {}){
     }
   } catch (e){
     if (e?.name === 'AbortError'){
-      log('note', 'CANCEL', 'run cancelled');
+      log('note', 'CANCEL', 'Auftrag abgebrochen');
       setState('', 'BEREIT', 'cancelled');
       setTag('', 'BEREIT');
     } else {
       log('error', 'ERROR', String(e).slice(0,200));
-      setState('error', 'FEHLER', 'stream dropped');
+      setState('error', 'FEHLER', 'Verbindung unterbrochen');
       setTag('err', 'ERROR');
     }
   }
@@ -130,7 +130,7 @@ function handle(ev){
       log('status', 'STATUS', msg);
       break;
     case 'latency':
-      log('latency', 'LATENCY', `first token after ${ev.ms}ms`);
+      log('latency', 'LATENCY', `Erste Antwort nach ${ev.ms} ms`);
       break;
     case 'tool':
       if (ev.phase === 'use')
@@ -147,22 +147,22 @@ function handle(ev){
       }
       break;
     case 'usage':
-      log('status', 'FERTIG', 'run completed', usageBlock(ev));
+      log('status', 'FERTIG', 'Auftrag abgeschlossen', usageBlock(ev));
       break;
     case 'complete':
       setState('done', 'FERTIG', (ev.ms!=null?`${ev.ms}ms`:'') );
       setTag('done', 'FERTIG');
-      log('complete', 'FERTIG', ev.ms!=null?`run completed in ${ev.ms}ms`:'run completed');
+      log('complete', 'FERTIG', ev.ms!=null?`run completed in ${ev.ms}ms`:'Auftrag abgeschlossen');
       renderAnswer(true);
       speakDone = speakThisRun ? speak(answer) : Promise.resolve();
       break;
     case 'error':
       setState('error', 'FEHLER', ev.message?.slice(0,40) || 'error');
       setTag('err', 'ERROR');
-      log('error', 'ERROR', ev.message || 'unknown');
+      log('error', 'ERROR', ev.message || 'Unbekannter Fehler');
       // show it in the panel too, so a failure isn't a silent empty box
       if (!answer) $('#response').innerHTML =
-        `<span style="color:var(--red)">⚠ ${esc(ev.message || 'Run failed.')}</span>`;
+        `<span style="color:var(--red)">⚠ ${esc(ev.message || 'Auftrag fehlgeschlagen.')}</span>`;
       else renderAnswer(true);
       break;
     case 'note':
@@ -270,7 +270,7 @@ async function micToggle(){
   if (SpeechRecognition){
     convo = true; suppress = false;
     $('#mic').classList.add('on'); $('#mic').textContent = '● Browser hört zu';
-    log('voice','VOICE','browser speech recognition open · listening');
+    log('voice','VOICE','Browser-Spracherkennung aktiv – höre zu');
     setState('listening','HÖRT ZU','Browser-Spracherkennung aktiv');
     startBrowserRecognition();
     return;
@@ -289,7 +289,7 @@ function stopConvo(){
   if (actx){ actx.close().catch(()=>{}); actx=null; analyser=null; }
   document.body.classList.remove('speaking');
   $('#mic').classList.remove('on'); $('#mic').textContent = '◉ VOICE';
-  log('voice','VOICE','conversation closed');
+  log('voice','VOICE','Sprachdialog beendet');
   setState('', 'BEREIT', 'warte auf Eingabe');
 }
 
@@ -326,7 +326,7 @@ function startBrowserRecognition(){
     if (convo) setTimeout(startBrowserRecognition, 350);
   };
   setState('listening','HÖRT ZU','Browser-Spracherkennung aktiv');
-  try{ recognition.start(); }catch(e){ log('error','VOICE','speech recognition failed to start'); }
+  try{ recognition.start(); }catch(e){ log('error','VOICE','Spracherkennung konnte nicht gestartet werden'); }
 }
 
 // ── one server-side ElevenLabs listening turn ──
@@ -382,14 +382,14 @@ function vtick(){
 
   if (rms > threshold){
     loudAt = t;
-    if (!spoke){ spoke = true; log('voice','VOICE','speech detected'); }
+    if (!spoke){ spoke = true; log('voice','VOICE','Sprache erkannt'); }
   } else if (spoke && t - loudAt > SILENCE){
-    return endTurn('silence');
+    return endTurn('Sprechpause');
   }
 
   // failsafes so it can never hang: cap the length, re-listen if no speech at all
-  if (t - turnStart > MAX_TURN_MS) return endTurn('max-length');
-  if (!spoke && t - turnStart > NO_SPEECH_MS) return endTurn('no-speech');
+  if (t - turnStart > MAX_TURN_MS) return endTurn('maximale Aufnahmelänge');
+  if (!spoke && t - turnStart > NO_SPEECH_MS) return endTurn('keine Sprache');
 }
 
 async function ship(){
@@ -412,8 +412,8 @@ async function ship(){
     const text = (r.text||'').trim();
     const ms = Math.round(performance.now() - t0);
     if (!text){
-      log('voice','VOICE','nothing transcribed');
-      if (convo) beginTurn(); else setState('','BEREIT','nothing heard');
+      log('voice','VOICE','Keine Sprache erkannt');
+      if (convo) beginTurn(); else setState('','BEREIT','Nichts gehört');
       return;
     }
     log('voice','SPRACHE',`Transkribiert durch ${RT.provider} in ${ms} ms: "${text}"`);
@@ -428,7 +428,7 @@ async function ship(){
   } catch(e){
     log('error','SPRACHE',`Transkription fehlgeschlagen: ${e.message || e}`);
     suppress = false;
-    if (convo) beginTurn(); else setState('error','FEHLER','transcription failed');
+    if (convo) beginTurn(); else setState('error','FEHLER','Transkription fehlgeschlagen');
   }
 }
 
@@ -462,16 +462,16 @@ $('#cmds').addEventListener('click', e => {
   transmit(cmd, {speak: !['/tools','/commands'].includes(cmd)});
 });
 const TIPS = {
-  '/new':'Fresh thread — clears the Hermes conversation and starts clean.',
-  '/goal':'Say your standing objective, e.g. “ship the dashboard and verify tool access”.',
-  '/tools':'Shows Hermes tool status from the active profile.',
-  '/toolsets':'Asks Hermes to list enabled toolsets and connected tools.',
-  '/browser':'Say a Chrome/browser mission, e.g. “inspect the current tab”.',
-  '/background':'Say a mission, e.g. “research competitors and save a report”.',
-  '/mission':'Add or read mission queue items.',
-  '/personality':'Set the persona, e.g. “calm, laconic, Stark tower operator”.',
-  '/kanban':'Ask about the work queue, e.g. “what’s on my board today?”.',
-  '/commands':'Show all dashboard slash commands.'
+  '/new':'Neues Gespräch beginnen und bisherigen Verlauf zurücksetzen.',
+  '/goal':'Dauerhaftes Ziel eingeben.',
+  '/tools':'Zeigt die Hermes-Werkzeuge des aktiven Profils.',
+  '/toolsets':'Zeigt aktive Werkzeugsätze und Verbindungen.',
+  '/browser':'Eine Browseraufgabe formulieren.',
+  '/background':'Einen Hintergrundauftrag formulieren.',
+  '/mission':'Aufträge ansehen oder hinzufügen.',
+  '/personality':'Den gewünschten Tonfall beschreiben.',
+  '/kanban':'Die Aufgabenliste abfragen.',
+  '/commands':'Alle verfügbaren Kurzbefehle anzeigen.'
 };
 let defaultTip = '';
 
@@ -489,7 +489,7 @@ $('#run').onclick = sendFromInput;
 $('#mic').onclick = micToggle;
 $('#showCommands').onclick = () => transmit('/commands', {speak:false});
 $('#missionBtn').onclick = () => transmit('/mission');
-$('#clearBtn').onclick = () => { answer=''; $('#response').innerHTML='<span class="rplaceholder">Display cleared. Standing by.</span>'; log('note','CLEAR','response panel cleared'); };
+$('#clearBtn').onclick = () => { answer=''; $('#response').innerHTML='<span class="rplaceholder">Display cleared. Standing by.</span>'; log('note','CLEAR','Antwortanzeige geleert'); };
 document.querySelectorAll('[data-quick]').forEach(b => b.onclick = () =>
   transmit(b.dataset.quick, {speak:false}));
 document.addEventListener('keydown', e => {
@@ -559,6 +559,6 @@ setInterval(async () => {
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
     sys('gw','offline','warn');
-    log('error','STATUS','server unreachable');
+    log('error','STATUS','Server nicht erreichbar');
   }
 })();
