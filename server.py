@@ -41,9 +41,12 @@ HERMES_AUDIO = AUDIO_BACKEND in ("auto", "hermes") and hermes_audio.available()
 if AUDIO_BACKEND == "hermes" and not HERMES_AUDIO:
     raise RuntimeError("Hermes-Sprachumgebung nicht gefunden. "
                        "JARVIS_HERMES_SOURCE oder JARVIS_HERMES_PYTHON prüfen.")
+if AUDIO_BACKEND == "elevenlabs" and not voice.available():
+    raise RuntimeError("ElevenLabs wurde ausdrücklich gewählt, aber kein API-Schlüssel eingerichtet.")
+# 'auto' wechselt ausschließlich zu kostenlosen Browserfunktionen, nie
+# unbeabsichtigt zu einem kostenpflichtigen Dienst.
 SPEECH_BACKEND = ("hermes" if HERMES_AUDIO else
-                  "browser" if AUDIO_BACKEND == "browser" else
-                  "elevenlabs" if voice.available() and AUDIO_BACKEND in ("auto", "elevenlabs") else
+                  "elevenlabs" if AUDIO_BACKEND == "elevenlabs" else
                   "browser")
 API_TOKEN = secrets.token_urlsafe(32)
 RUN_LOCK = threading.Lock()
