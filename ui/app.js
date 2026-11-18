@@ -88,6 +88,10 @@ async function transmit(message, options = {}){
       method:'POST', headers:apiHeaders({'content-type':'application/json'}),
       body: JSON.stringify({message, fresh}), signal:activeController.signal
     });
+    if (res.status === 401){
+      location.assign('/login');
+      throw new Error('Bitte erneut bei JARVIS anmelden.');
+    }
     if (!res.ok) throw new Error(`Server meldet HTTP ${res.status}`);
     const reader = res.body.getReader();
     const dec = new TextDecoder();
@@ -251,6 +255,10 @@ function speak(text){
 // ── Sprachgespräch starten und beenden ──
 async function micToggle(){
   if (convo){ stopConvo(); return; }
+  if (!window.isSecureContext){
+    log('error','SPRACHE','Für den Mikrofonzugriff ist HTTPS erforderlich. Bitte JARVIS über den HTTPS-Reverse-Proxy öffnen.');
+    return;
+  }
   // Vorhandene Hermes-Spracherkennung bevorzugen. Falls ausdrücklich gewählt,
   // ist auch der optionale ElevenLabs-Dienst möglich. Die Browser-Erkennung
   // dient als kostenloser Ausweichweg.
@@ -490,6 +498,10 @@ let defaultTip = '';
 
 // ══════════ Bedienelemente ══════════
 function sendFromInput(){
+  if (running){
+    log('note','BESETZT','Jarvis antwortet noch. Deine Eingabe bleibt erhalten.');
+    return;
+  }
   const armed = $('#input').dataset.cmd || '';
   const raw = $('#input').value.trim();
   if (!raw && !armed) return;
@@ -521,8 +533,23 @@ $('#mute').onclick = () => {
   if (muted && speechSynth) speechSynth.cancel();
 };
 $('#input').addEventListener('keydown', e => {
-  if (e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); sendFromInput(); }
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing){
+    e.preventDefault();
+    sendFromInput();
+  }
 });
+$('#logout').onclick = async () => {
+  try {
+    const response = await fetch('/api/logout', {
+      method:'POST', credentials:'same-origin',
+      headers:apiHeaders({'content-type':'application/json'}), body:'{}'
+    });
+    if (!response.ok) throw new Error('Abmeldung fehlgeschlagen.');
+    location.replace('/login');
+  } catch(e){
+    log('error','ANMELDUNG',e.message || String(e));
+  }
+};
 
 // ══════════ system panel ══════════
 function sys(id, val, cls){
@@ -547,7 +574,13 @@ setInterval(async () => {
 (async () => {
   defaultTip = $('#tip').textContent;
   try {
-    const s = await fetch('/api/status').then(r=>r.json());
+    const statusResponse = await fetch('/api/status');
+    if (statusResponse.status === 401){
+      location.replace('/login');
+      return;
+    }
+    if (!statusResponse.ok) throw new Error('HTTP ' + statusResponse.status);
+    const s = await statusResponse.json();
     RT.provider = s.stt || 'browser';
     RT.tts = ['hermes','elevenlabs'].includes(s.tts);
     RT.stt = ['hermes','elevenlabs'].includes(s.stt);
@@ -571,6 +604,16 @@ setInterval(async () => {
         `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigungen gemäß Hermes-Profil`);
     log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${label(s.stt)}, Ausgabe: ${label(s.tts)}`);
     $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprachdialog');
+    if (!window.isSecureContext){
+      $('#voiceWarning').hidden = false;
+      $('#mic').disabled = true;
+      $('#mic').textContent = '🔒 Mikrofon: HTTPS nötig';
+      $('#mic').title = 'Für das Mikrofon bitte JARVIS über HTTPS öffnen.';
+    } else {
+      $('#voiceWarning').hidden = true;
+      $('#mic').disabled = false;
+    }
+    if (window.innerWidth > 720) $('#input').focus();
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
     sys('gw','offline','warn');
