@@ -62,7 +62,7 @@ async function transmit(message, options = {}){
   if (!message.trim()) return;
   if (running){
     // don't silently swallow it — say so, so it never looks like nothing happened
-    log('note','BUSY',`Jarvis arbeitet noch – "${message.slice(0,40)}" wurde nicht gesendet. Esc zum Abbrechen.`);
+    log('note','BESETZT',`Jarvis arbeitet noch – "${message.slice(0,40)}" wurde nicht gesendet. Esc zum Abbrechen.`);
     return;
   }
   running = true; answer = ''; firstDelta = false; speakThisRun = options.speak !== false;
@@ -156,7 +156,7 @@ function handle(ev){
       break;
     case 'error':
       setState('error', 'FEHLER', ev.message?.slice(0,40) || 'Fehler');
-      setTag('err', 'ERROR');
+      setTag('err', 'FEHLER');
       log('error', 'FEHLER', ev.message || 'Unbekannter Fehler');
       // show it in the panel too, so a failure isn't a silent empty box
       if (!answer) $('#response').innerHTML =
@@ -228,7 +228,13 @@ function speak(text){
     if (!RT.tts) return resolve();
     fetch('/api/speak', {method:'POST', headers:apiHeaders({'content-type':'application/json'}),
                          body: JSON.stringify({text:spoken})})
-      .then(r => r.ok ? r.blob() : Promise.reject())
+      .then(async r => {
+        if (!r.ok){
+          const e = await r.json().catch(() => ({}));
+          throw new Error(e.error || 'HTTP ' + r.status);
+        }
+        return r.blob();
+      })
       .then(blob => {
         const url = URL.createObjectURL(blob);
         if (player) player.pause();
@@ -250,6 +256,10 @@ async function micToggle(){
   // across Chrome profiles and often fails silently; ElevenLabs receives the
   // actual microphone recording from MediaRecorder and is much more consistent.
   if (RT.stt){
+    if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia){
+      log('error','SPRACHE','Dieser Browser unterstützt keine sichere Mikrofonaufnahme. HTTPS oder localhost prüfen.');
+      return;
+    }
     try {
       micStream = await navigator.mediaDevices.getUserMedia(
         {audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
@@ -283,6 +293,7 @@ function stopConvo(){
   if (recorder && recorder.state==='recording'){ recorder._cancel=true; try{recorder.stop();}catch(_){} }
   recorder = null;
   if (player){ try{player.pause();}catch(_){} }
+  if (speechSynth){ try{speechSynth.cancel();}catch(_){} }
   if (micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
   if (actx){ actx.close().catch(()=>{}); actx=null; analyser=null; }
   document.body.classList.remove('speaking');
@@ -309,7 +320,13 @@ function startBrowserRecognition(){
     const shown = (finalText || interim || '').trim();
     if (shown) $('#strun').textContent = 'ERKANNT: ' + shown.slice(0,42);
   };
-  recognition.onerror = e => log('error','SPRACHE',`Browser-Spracherkennung: ${e.error || 'Fehler'}`);
+  recognition.onerror = e => {
+    log('error','SPRACHE',`Browser-Spracherkennung: ${e.error || 'Fehler'}`);
+    if (['not-allowed','service-not-allowed','audio-capture'].includes(e.error)){
+      stopConvo();
+      setState('error','FEHLER','Mikrofon oder Spracherkennung nicht verfügbar');
+    }
+  };
   recognition.onend = async () => {
     const text = finalText.trim();
     if (!convo) return;
@@ -425,8 +442,8 @@ async function ship(){
     if (convo) beginTurn();
   } catch(e){
     log('error','SPRACHE',`Transkription fehlgeschlagen: ${e.message || e}`);
-    suppress = false;
-    if (convo) beginTurn(); else setState('error','FEHLER','Transkription fehlgeschlagen');
+    stopConvo();
+    setState('error','FEHLER','Spracherkennung fehlgeschlagen');
   }
 }
 
@@ -503,6 +520,7 @@ $('#mute').onclick = () => {
   muted = !muted; const b=$('#mute');
   b.textContent = muted?'🔇':'🔊'; b.classList.toggle('on',!muted); b.classList.toggle('off',muted);
   if (muted && player) player.pause();
+  if (muted && speechSynth) speechSynth.cancel();
 };
 $('#input').addEventListener('keydown', e => {
   if (e.key==='Enter' && (e.metaKey||e.ctrlKey)){ e.preventDefault(); sendFromInput(); }
@@ -538,25 +556,26 @@ setInterval(async () => {
     RT.browserStt = !!SpeechRecognition; RT.browserTts = !!speechSynth;
 
     const port = location.port || '8730';
-    sys('gw', `online · :${port}`, 'ok');
-    sys('brain', s.runtime === 'hermes' ? 'Hermes Agent' : 'Hermes offline', s.runtime === 'hermes' ? 'ok' : 'warn');
-    sys('voice', `${RT.stt?(RT.provider === 'hermes'?'Hermes / Whisper':'ElevenLabs'):'Browser'} / ${RT.tts?(s.tts === 'hermes'?'Hermes TTS':'ElevenLabs'):'Browser'}`, (RT.browserStt||RT.stt) ? '' : 'warn');
-    sys('profile', s.profile || 'default');
-    sys('runtime', s.runtime || '—', s.runtime === 'hermes' ? 'ok' : 'warn');
+    sys('gw', `Erreichbar · :${port}`, 'ok');
+    sys('brain', s.runtime === 'hermes' ? 'Hermes Agent' : 'Hermes nicht erreichbar', s.runtime === 'hermes' ? 'ok' : 'warn');
+    const label = p => p === 'hermes' ? 'Hermes' : p === 'elevenlabs' ? 'ElevenLabs' : 'Browser';
+    sys('voice', `${label(s.stt)} (Eingabe) / ${label(s.tts)} (Ausgabe)`, (RT.browserStt||RT.stt) ? '' : 'warn');
+    sys('profile', s.profile || 'Standard');
+    sys('runtime', s.runtime === 'hermes' ? 'Hermes aktiv' : 'Hermes nicht verbunden', s.runtime === 'hermes' ? 'ok' : 'warn');
     sys('clock', now());
     $('#top-gw').textContent = `Verbindung: erreichbar (${location.origin})`;
-    $('#top-profile').textContent = 'Profil: ' + (s.profile || 'default');
-    $('#top-voice').textContent = 'Sprache: ' + (s.stt === 'hermes' ? 'Hermes STT' : s.stt) + ' / ' + (s.tts === 'hermes' ? 'Hermes TTS' : s.tts);
+    $('#top-profile').textContent = 'Profil: ' + (s.profile || 'Standard');
+    $('#top-voice').textContent = `Sprache: ${label(s.stt)} (Eingabe) / ${label(s.tts)} (Ausgabe)`;
     const tools = (s.tools || []).slice(0, 12);
     $('#toolsList').innerHTML = tools.length ? tools.map(t => `<span class="chip">${esc(t)}</span>`).join('') : '<span class="chip ghost">Hermes-Werkzeuge nicht abrufbar – HERMES_CMD prüfen</span>';
 
     log('status', 'START',
         `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigung: ${s.permission}`);
     log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${s.stt}, Ausgabe: ${s.tts}`);
-    $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprache');
+    $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprachdialog');
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
     sys('gw','offline','warn');
-    log('error','STATUS','Server nicht erreichbar');
+    log('error','STATUS',`Server nicht erreichbar: ${e.message || e}`);
   }
 })();
