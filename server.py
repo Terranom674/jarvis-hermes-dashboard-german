@@ -34,8 +34,13 @@ if _env.exists():
 import commands         # noqa: E402
 import runtime          # noqa: E402
 import voice            # noqa: E402
+import hermes_audio     # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8730"))
+# Uses Hermes' configured STT/TTS when installed; ElevenLabs/browser remain optional.
+AUDIO_BACKEND = os.environ.get("JARVIS_AUDIO_BACKEND", "auto").strip().lower()
+HERMES_AUDIO = AUDIO_BACKEND in ("auto", "hermes") and hermes_audio.available()
+SPEECH_BACKEND = "hermes" if HERMES_AUDIO else ("elevenlabs" if voice.available() else "browser")
 API_TOKEN = secrets.token_urlsafe(32)
 RUN_LOCK = threading.Lock()
 MAX_JSON_BODY = 1024 * 1024
@@ -119,10 +124,10 @@ class Handler(BaseHTTPRequestHandler):
                 tools=runtime.hermes_tools_snapshot(),
                 browser_stt=True,
                 browser_tts=True,
-                voice_mode=os.environ.get("JARVIS_VOICE_MODE", "elevenlabs" if voice.available() else "browser"),
-                voice_id=voice.voice_id() if voice.available() else "browser",
-                stt="elevenlabs" if voice.available() else "browser",
-                tts="elevenlabs" if voice.available() else "browser",
+                voice_mode=SPEECH_BACKEND,
+                voice_id="Hermes-Konfiguration" if HERMES_AUDIO else (voice.voice_id() if voice.available() else "browser"),
+                stt=SPEECH_BACKEND,
+                tts=SPEECH_BACKEND,
                 session=SESSION["id"]))
         if p == "/api/jobs":
             if not self._token_ok():
@@ -162,6 +167,9 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/speak":
             try:
                 text = (json.loads(raw or b"{}").get("text") or "").strip()
+                if HERMES_AUDIO:
+                    audio, mime = hermes_audio.speak(text)
+                    return self._bytes(audio, mime)
                 return self._bytes(voice.speak(text), "audio/mpeg")
             except Exception as e:                        # noqa: BLE001
                 return self._json({"error": str(e)[:200]}, 503)
@@ -169,7 +177,8 @@ class Handler(BaseHTTPRequestHandler):
         if p == "/api/listen":
             try:
                 mime = self.headers.get("Content-Type", "audio/webm")
-                return self._json({"text": voice.transcribe(raw, mime)})
+                transcript = hermes_audio.transcribe(raw, mime) if HERMES_AUDIO else voice.transcribe(raw, mime)
+                return self._json({"text": transcript})
             except Exception as e:                        # noqa: BLE001
                 return self._json({"error": str(e)[:300], "text": ""}, 503)
 
@@ -260,8 +269,8 @@ def main():
     kind = runtime.runtime_kind()
     brain = ("Hermes Agent (profile tools, skills, memory, MCP, browser integrations live)"
              if kind == "hermes" else "MOCK — Hermes CLI not reachable")
-    vo = (f"ElevenLabs · {voice.voice_id()[:8]}…" if voice.available()
-          else "none (add ELEVENLABS_API_KEY for voice)")
+    vo = ("Hermes STT/TTS" if HERMES_AUDIO else
+          (f"ElevenLabs · {voice.voice_id()[:8]}…" if voice.available() else "Browser STT/TTS"))
     perm = runtime.PERMISSION
     perm_note = ("  can run tools without asking — set JARVIS_PERMISSION=default to require approval"
                  if perm == "bypass" else "")
