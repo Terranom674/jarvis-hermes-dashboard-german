@@ -1,15 +1,17 @@
 [Unit]
 Description=JARVIS Hermes-Kommandozentrale (Deutsch)
-After=network-online.target
 Wants=network-online.target
+After=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=%h/jarvis-hermes-dashboard-german
-ExecStart=/usr/bin/python3 %h/jarvis-hermes-dashboard-german/server.py
-Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+User=jarvis
+WorkingDirectory=/home/jarvis/jarvis-hermes-dashboard-german
+ExecStart=/usr/bin/python3 /home/jarvis/jarvis-hermes-dashboard-german/server.py
+Environment=HOME=/home/jarvis
+Environment=PATH=/home/jarvis/.local/bin:/usr/local/bin:/usr/bin:/bin
 Restart=on-failure
 RestartSec=3
 
 [Install]
-WantedBy=default.target
+WantedBy=multi-user.target
