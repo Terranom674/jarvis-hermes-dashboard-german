@@ -8,6 +8,8 @@ Deutschsprachige Weiterentwicklung von [JARVIS Hermes Dashboard](https://github.
 
 - Animierte, türkisfarbene JARVIS-Kommandozentrale im Browser
 - Deutschsprachige Beschriftungen, Meldungen und Bedienelemente
+- Texteingabe, Senden und Mikrofon direkt unter der JARVIS-Antwort
+- Eigene Passwort-Anmeldeseite statt Browser-Popup: kein Benutzername, 30 Tage Gerätesitzung
 - Browser-Spracherkennung mit Spracheinstellung **de-DE**
 - Bevorzugte Nutzung der **vorhandenen Hermes-Spracherkennung und -Sprachausgabe**
 - Für bestehende Setups geeignet: **lokales Faster-Whisper** und die in Hermes eingerichtete **Edge-TTS-Stimme** (z. B. `de-DE-FlorianMultilingualNeural`)
@@ -60,9 +62,9 @@ Anschließend im Heimnetz auf PC, Tablet oder Smartphone öffnen:
 
 **http://192.168.51.102:8730**
 
-Der Browser verlangt Benutzername `jarvis` und ein individuell erzeugtes Kennwort. Das Installationsskript zeigt dieses einmal im Terminal an und speichert es in `.env` mit Zugriffsrechten nur für den jeweiligen Benutzer.
+Die Oberfläche zeigt eine eigene JARVIS-Anmeldeseite mit **einem einzigen Passwortfeld**. Ein Benutzername ist nicht erforderlich. Nach der Anmeldung bleibt das Gerät bis zu 30 Tage angemeldet (HttpOnly-Sitzungs-Cookie). Das Passwort aus der bisherigen `.env` wird weiterverwendet und nicht automatisch geändert. Das Installationsskript kann es im lokalen Terminal anzeigen.
 
-Der Dienst nutzt die LAN-IP `192.168.51.102` und keinen zusätzlichen öffentlich freizugebenden Port. **Keine Portweiterleitung für 8730 ins Internet einrichten.** Da der erste LAN-Aufruf über HTTP erfolgt, ist er vorerst zur Anzeige und Texteingabe gedacht; für sichere Mikrofonfreigaben auf anderen Endgeräten muss die Oberfläche danach über die vorhandene HTTPS-Reverse-Proxy-Infrastruktur erreichbar sein. **HTTP-Basic-Anmeldedaten werden ohne HTTPS nicht verschlüsselt übertragen**; daher ist der unverschlüsselte Zugriff ausschließlich für ein vertrauenswürdiges Heimnetz vorgesehen.
+Der Dienst nutzt die LAN-IP `192.168.51.102` und keinen zusätzlichen öffentlich freizugebenden Port. **Keine Portweiterleitung für 8730 ins Internet einrichten.** Da der erste LAN-Aufruf über HTTP erfolgt, ist er vorerst zur Anzeige und Texteingabe gedacht; für sichere Mikrofonfreigaben auf anderen Endgeräten muss die Oberfläche danach über die vorhandene HTTPS-Reverse-Proxy-Infrastruktur erreichbar sein. **Anmeldepasswort und Sitzungs-Cookie werden über HTTP nicht verschlüsselt übertragen**. Der direkte LAN-Zugriff ist deshalb nur als Übergangslösung in einem vertrauenswürdigen Heimnetz geeignet; für regulären Betrieb HTTPS über Nginx Proxy Manager konfigurieren.
 
 Bei einer späteren HTTPS-Einrichtung über Nginx Proxy Manager wird `JARVIS_PUBLIC_URL` in `.env` auf die tatsächliche HTTPS-Adresse umgestellt. Die Oberfläche akzeptiert diese Adresse dann als gültigen Host und Anfrageursprung. Ein zusätzlicher Passwortschutz bzw. die Access List des Reverse Proxy wird empfohlen.
 
@@ -86,7 +88,7 @@ ssh -N -L 8730:127.0.0.1:8730 benutzer@SERVER-IP
 
 Danach im Browser **auf dem Gerät mit dem SSH-Tunnel** `http://127.0.0.1:8730` aufrufen.
 
-**Nicht direkt über einen öffentlichen Port bereitstellen.** Der Server lauscht absichtlich nur auf `127.0.0.1`. Eine spätere Bereitstellung über einen Reverse Proxy benötigt ein separates, sicher konfiguriertes Zugriffs- und Authentifizierungskonzept. Das Dashboard enthält **keine vollständige Benutzerverwaltung**. Ein API-Token im Quelltext der angezeigten Webseite ist kein Ersatz für eine Anmeldung.
+**Nicht direkt über einen öffentlichen Port bereitstellen.** Der Server lauscht absichtlich nur auf `127.0.0.1`. Die JARVIS-Weboberfläche hat eine eigene Passwort-Anmeldeseite mit signiertem Sitzungscookie. Der Zugang nutzt keine getrennten Benutzernamen. Für eine spätere HTTPS-Bereitstellung muss `JARVIS_PUBLIC_URL` in `.env` auf die gewünschte HTTPS-Domain gesetzt und der Dienst neu gestartet werden. Eine IP-Freigabeliste im Proxy bzw. ein VPN ist als zusätzliche Begrenzung sinnvoll. Es gibt weiterhin keine Mehrbenutzerverwaltung.
 
 ## Deutsche Sprachfunktionen
 
@@ -162,7 +164,7 @@ Fachliche Werkzeugnamen und technische Schnittstellennamen bleiben gegebenenfall
 
 Die eigentliche Funktion kann erst mit der dort installierten Hermes-Version bestätigt werden. Insbesondere: Erkennung der vorhandenen Python-Umgebung, Faster-Whisper für deutschsprachige Audioaufnahmen, Edge-TTS-Ausgabe mit der eingestellten Stimme, Hermes-CLI-Sitzungen und der Zugriff über einen sicheren Browserkontext.
 
-Die Sprachsteuerung wird über eine Taste im HUD gestartet; ein permanent aktives lokales Wake-Word wird vom ursprünglichen Projekt nicht bereitgestellt. Hintergrundaufträge werden vom Dashboard nicht ausfallsicher fortgesetzt, wenn sein Python-Prozess beendet wird.
+Die Sprachsteuerung wird über eine Taste im zentralen Eingabefeld gestartet; ein permanent aktives lokales Wake-Word wird vom ursprünglichen Projekt nicht bereitgestellt. Hintergrundaufträge werden vom Dashboard nicht ausfallsicher fortgesetzt, wenn sein Python-Prozess beendet wird.
 
 ## Lizenz
 
