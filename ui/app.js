@@ -542,7 +542,7 @@ setInterval(async () => {
     const port = location.port || '8730';
     sys('gw', `online · :${port}`, 'ok');
     sys('brain', s.runtime === 'hermes' ? 'Hermes Agent' : 'Hermes offline', s.runtime === 'hermes' ? 'ok' : 'warn');
-    sys('voice', `${RT.stt?(RT.provider === 'hermes'?'Hermes / Whisper':'ElevenLabs'):'Browser'} / ${RT.tts?(s.tts === 'hermes'?'Hermes / Florian':'ElevenLabs'):'Browser'}`, (RT.browserStt||RT.stt) ? '' : 'warn');
+    sys('voice', `${RT.stt?(RT.provider === 'hermes'?'Hermes / Whisper':'ElevenLabs'):'Browser'} / ${RT.tts?(s.tts === 'hermes'?'Hermes TTS':'ElevenLabs'):'Browser'}`, (RT.browserStt||RT.stt) ? '' : 'warn');
     sys('profile', s.profile || 'default');
     sys('runtime', s.runtime || '—', s.runtime === 'hermes' ? 'ok' : 'warn');
     sys('clock', now());
@@ -555,7 +555,7 @@ setInterval(async () => {
     log('status', 'BOOT',
         `gateway online · ${s.runtime} core · profile=${s.profile || 'default'} · permission=${s.permission}`);
     log('voice', 'VOICE', `Sprachkanal bereit – ${s.stt} / ${s.tts}`);
-    $('#mic').textContent = RT.stt ? '◉ Hermes-Sprachdialog' : '◉ Browser-Sprache';
+    $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprache');
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
     sys('gw','offline','warn');
