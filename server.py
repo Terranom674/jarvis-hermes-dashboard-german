@@ -4,6 +4,8 @@ Verwendet das vorhandene Hermes-Profil mit Gedächtnis, Skills und Werkzeugen.
 Die Sprachdienste werden bevorzugt direkt aus der Hermes-Konfiguration geladen.
 """
 
+import base64
+import binascii
 import json
 import mimetypes
 import os
@@ -33,6 +35,15 @@ import voice            # noqa: E402
 import hermes_audio     # noqa: E402
 
 PORT = int(os.environ.get("JARVIS_PORT", "8730"))
+BIND = os.environ.get("JARVIS_BIND", "127.0.0.1").strip()
+PUBLIC_URL = os.environ.get("JARVIS_PUBLIC_URL", f"http://{BIND}:{PORT}").rstrip("/")
+PUBLIC_ORIGIN = urlparse(PUBLIC_URL)
+ACCESS_USER = os.environ.get("JARVIS_ACCESS_USER", "jarvis")
+ACCESS_PASSWORD = os.environ.get("JARVIS_ACCESS_PASSWORD", "")
+if BIND not in ("127.0.0.1", "localhost", "::1") and not ACCESS_PASSWORD:
+    raise RuntimeError("Netzwerkzugriff braucht JARVIS_ACCESS_PASSWORD in der .env.")
+if PUBLIC_ORIGIN.scheme not in ("http", "https") or not PUBLIC_ORIGIN.netloc or PUBLIC_ORIGIN.path not in ("", "/"):
+    raise ValueError("JARVIS_PUBLIC_URL muss eine vollständige HTTP(S)-Adresse ohne Pfad sein.")
 # Hermes-STT/TTS bevorzugen; Browser/ElevenLabs bleiben optionale Alternativen.
 AUDIO_BACKEND = os.environ.get("JARVIS_AUDIO_BACKEND", "auto").strip().lower()
 if AUDIO_BACKEND not in ("auto", "hermes", "browser", "elevenlabs"):
@@ -101,13 +112,41 @@ class Handler(BaseHTTPRequestHandler):
 
     def _host_ok(self):
         host = self.headers.get("Host", "")
-        return host in {f"127.0.0.1:{PORT}", f"localhost:{PORT}"}
+        return host in {f"127.0.0.1:{PORT}", f"localhost:{PORT}", PUBLIC_ORIGIN.netloc}
 
     def _origin_ok(self):
         origin = self.headers.get("Origin")
         return origin in {
-            f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}"
+            f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}",
+            f"{PUBLIC_ORIGIN.scheme}://{PUBLIC_ORIGIN.netloc}",
         }
+
+    def _authorized(self):
+        """Im Netzwerk alle Inhalte und API-Zugriffe mit Passwort schützen."""
+        if not ACCESS_PASSWORD:
+            return True  # Nur lokale Bindung ohne Passwort zulässig.
+        header = self.headers.get("Authorization", "")
+        if not header.startswith("Basic "):
+            return False
+        try:
+            username, password = base64.b64decode(header[6:], validate=True).decode("utf-8").split(":", 1)
+        except (binascii.Error, UnicodeDecodeError, ValueError):
+            return False
+        return (secrets.compare_digest(username, ACCESS_USER) and
+                secrets.compare_digest(password, ACCESS_PASSWORD))
+
+    def _require_login(self):
+        if self._authorized():
+            return False
+        data = "Anmeldung erforderlich.".encode("utf-8")
+        self.send_response(401)
+        self.send_header("WWW-Authenticate", 'Basic realm="JARVIS", charset="UTF-8"')
+        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        self.send_header("Content-Length", str(len(data)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(data)
+        return True
 
     def _token_ok(self):
         supplied = self.headers.get("X-Jarvis-Token", "")
@@ -117,6 +156,8 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._json({"error": "Ungültiger Hostname."}, 403)
+        if self._require_login():
+            return
         p = urlparse(self.path).path
         if p == "/api/status":
             return self._json(dict(
@@ -157,6 +198,8 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if not self._host_ok() or not self._origin_ok():
             return self._json({"error": "Anfrageursprung abgewiesen."}, 403)
+        if self._require_login():
+            return
         if not self._token_ok():
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
@@ -288,13 +331,14 @@ def main():
   Profil:         {runtime.PROFILE}
   Arbeitsordner:  {runtime.WORKDIR}
   Sprachmodus:    {voice_name}
-  Zugang:         http://127.0.0.1:{PORT}
-  Netzwerk:       Nur localhost (kein öffentlicher Zugriff)
+  Zugang:         {PUBLIC_URL}
+  Bind-Adresse:   {BIND}
+  Zugriffsschutz: {"Passwort" if ACCESS_PASSWORD else "nur localhost"}
 """, flush=True)
 
-    srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
+    srv = ThreadingHTTPServer((BIND, PORT), Handler)
     if os.environ.get("JARVIS_OPEN", "0") != "0":
-        webbrowser.open(f"http://127.0.0.1:{PORT}")
+        webbrowser.open(PUBLIC_URL)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
