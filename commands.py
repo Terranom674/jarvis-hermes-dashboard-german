@@ -1,5 +1,5 @@
 """
-Command matrix for the Hermes-backed JARVIS dashboard.
+JARVIS-Befehlszentrale für den vorhandenen Hermes Agent.
 
 Local commands keep the HUD fast for mission control/status while prompts and
 unknown slash commands are handed to Hermes Agent. Hermes-native tool access comes
@@ -66,14 +66,14 @@ def context_block():
     d = load()
     out = []
     if d["profile"]:
-        out.append("## User profile notes from JARVIS dashboard\n" + "\n".join(f"- {x}" for x in d["profile"][-40:]))
+        out.append("## Benutzerprofilnotizen aus JARVIS\n" + "\n".join(f"- {x}" for x in d["profile"][-40:]))
     if d["goal"]:
-        out.append(f"## Standing objective\n{d['goal']}\nKeep it in mind; mention it only when relevant.")
+        out.append(f"## Dauerhaftes Ziel\n{d['goal']}\nBerücksichtige es, wenn es zur Anfrage passt.")
     if d["personality"]:
-        out.append(f"## Tone overlay\n{d['personality']}\nThis adjusts delivery; stay concise.")
+        out.append(f"## Tonfallvorgabe\n{d['personality']}\nBerücksichtige den gewünschten Tonfall.")
     open_tasks = [t for t in d["tasks"] if not t.get("done")]
     if open_tasks:
-        out.append("## Mission queue\n" + "\n".join(f"- {t['text']}" for t in open_tasks[:20]))
+        out.append("## Auftragsliste\n" + "\n".join(f"- {t['text']}" for t in open_tasks[:20]))
     return "\n\n".join(out)
 
 
@@ -98,12 +98,12 @@ def start_background(mission, runner):
                     text += ev["text"]
                 elif ev.get("t") == "error":
                     status = "failed"
-                    text = text or ("failed: " + str(ev.get("message", ""))[:260])
+                    text = text or ("Fehlgeschlagen: " + str(ev.get("message", ""))[:260])
         except Exception as e:  # noqa: BLE001
             status = "failed"
-            text = f"failed: {e}"[:260]
+            text = f"Fehlgeschlagen: {e}"[:260]
         with _JOB_LOCK:
-            JOBS[jid].update(status="done", result=text.strip(), finished=time.time())
+            JOBS[jid].update(status=status, result=text.strip(), finished=time.time())
         def finish(d2):
             for item in d2.get("missions", []):
                 if item.get("id") == jid:
@@ -121,13 +121,26 @@ def jobs_snapshot():
 
 def take_finished():
     with _JOB_LOCK:
-        done = [dict(j) for j in JOBS.values() if j["status"] == "done"]
+        done = [dict(j) for j in JOBS.values() if j["status"] in ("done", "failed")]
         for j in done:
             JOBS.pop(j["id"], None)
         return done
 
 
-_CMD = re.compile(r"^\s*/(new|profile|goal|personality|kanban|mission|missions|background|tools|toolsets|connectors|connect|status|commands|help|browser|clear)\b\s*(.*)$", re.I | re.S)
+_ALIASES = {
+    "neu": "new", "profil": "profile", "ziel": "goal",
+    "tonfall": "personality", "aufgaben": "kanban",
+    "auftrag": "mission", "auftraege": "missions", "aufträge": "missions",
+    "hintergrund": "background", "werkzeuge": "tools",
+    "werkzeugsaetze": "toolsets", "werkzeugsätze": "toolsets",
+    "verbindungen": "connectors", "verbinden": "connect",
+    "befehle": "commands", "hilfe": "help", "leeren": "clear",
+}
+_CMD = re.compile(r"^\s*/([a-zA-ZäöüÄÖÜß]+)\b\s*(.*)$", re.I | re.S)
+_KNOWN_COMMANDS = set(
+    "new profile goal personality kanban mission missions background tools toolsets "
+    "connectors connect status commands help browser clear".split()
+)
 
 
 def _hermes_command(*args):
@@ -146,115 +159,161 @@ def _shell(cmd, timeout=25):
                            stderr=subprocess.PIPE, timeout=timeout)
         return (p.stdout or p.stderr or "").strip()[:3500]
     except Exception as e:  # noqa: BLE001
-        return f"Unavailable: {e}"
+        return f"Nicht verfügbar: {e}"
 
 
 def _commands_reply():
-    return """Verfügbare JARVIS-Kurzbefehle:
-/new — neues Hermes-Gespräch starten
-/goal <text|status|clear> — dauerhaftes Ziel setzen, anzeigen oder löschen
-/profile <info> — lokale Profilnotiz speichern
-/personality <tonfall> — Tonfall anpassen
-/kanban [aufgabe] — Auftragsliste anzeigen oder Aufgabe hinzufügen
-/mission [aufgabe] — wie /kanban
-/background <auftrag> — Hermes-Auftrag im Hintergrund ausführen
-/tools — Hermes-Werkzeuge anzeigen
-/connectors — Informationen zu Hermes-Verbindungen
-/connect <name> — Hilfe für eine externe Hermes-Verbindung
-/toolsets — verfügbare Werkzeugsätze abfragen
-/status — Status des Dashboards
-/browser <auftrag> — Browser-Auftrag an Hermes übergeben
-/clear — Antwortbereich leeren
-/help oder /commands — diese Übersicht anzeigen
+    return """JARVIS-Kurzbefehle – deutsche und ursprüngliche Namen:
+/neu oder /new – neues Gespräch beginnen
+/ziel <Text> – Ziel speichern; /ziel status oder /ziel löschen
+/profil <Info> – zusätzliche Profilnotiz speichern
+/tonfall <Beschreibung> – Sprachstil anpassen
+/aufgaben [Aufgabe] – Auftragsliste ansehen oder Aufgabe eintragen
+/auftrag [Aufgabe] – wie /aufgaben
+/hintergrund <Auftrag> – Hermes im Hintergrund beauftragen
+/werkzeuge – aktivierte Hermes-Werkzeuge auflisten
+/werkzeugsaetze – Hermes-Werkzeugsätze abfragen
+/verbindungen – vorhandene Hermes-Anbindungen erläutern
+/verbinden <Dienst> – Verbindung eines Dienstes mit Hermes erklären
+/status – JARVIS-Status anzeigen
+/browser <Auftrag> – Browser-Auftrag ausführen
+/leeren – Antwortanzeige leeren
+/hilfe oder /befehle – Übersicht anzeigen
 
-Freier Text und unbekannte /-Befehle werden an Hermes weitergegeben."""
+Alle bisherigen englischen Befehle bleiben verwendbar.
+Normaler Text geht direkt an Hermes."""
 
 
 def handle(message, runner=None):
     m = _CMD.match(message or "")
     if not m:
         return None
-    cmd, arg = m.group(1).lower(), m.group(2).strip()
+    raw, arg = m.group(1).lower(), m.group(2).strip()
+    cmd = _ALIASES.get(raw, raw)
+    if cmd not in _KNOWN_COMMANDS:
+        return None
     d = load()
 
     if cmd in ("help", "commands"):
-        return dict(message=None, reply=_commands_reply(), note="commands shown")
+        return dict(message=None, reply=_commands_reply(), note="Befehle angezeigt")
 
     if cmd == "clear":
-        return dict(message=None, reply="Display cleared. Hermes session is unchanged.", note="display clear")
+        return dict(message=None, reply="Antwortbereich geleert. Das Gespräch bleibt erhalten.",
+                    note="Anzeige geleert")
 
     if cmd == "new":
-        return dict(fresh=True, message=arg or "Start a fresh Hermes dashboard session. Greet me in one concise JARVIS-style line.", note="Hermes thread reset")
+        return dict(fresh=True,
+                    message=arg or "Beginne ein neues Gespräch. Begrüße mich kurz und natürlich auf Deutsch.",
+                    note="Neues Hermes-Gespräch")
 
     if cmd == "status":
         profile = os.environ.get("HERMES_PROFILE", os.environ.get("JARVIS_PROFILE", "default"))
-        runtime = os.environ.get("HERMES_CMD", "hermes")
-        return dict(message=None, reply=f"Hermes dashboard online. profile={profile}; runtime={runtime}; workdir={os.getcwd()}; voice=browser Web Speech + optional ElevenLabs.", note="status read")
+        audio = os.environ.get("JARVIS_AUDIO_BACKEND", "auto")
+        return dict(message=None,
+                    reply=f"JARVIS ist erreichbar. Hermes-Profil: {profile}. "
+                          f"Sprachmodus: {audio}. Arbeitsordner: {os.getcwd()}",
+                    note="Status abgerufen")
 
     if cmd in ("tools", "toolsets"):
         if cmd == "tools":
             out = _shell(_hermes_command("tools", "list"))
-            reply = out or "No tool list returned. Start from a shell where `hermes tools list` works, or set HERMES_CMD."
-            return dict(message=None, reply=reply, note="Hermes tools listed")
-        return dict(message="List my enabled Hermes toolsets and connected third-party tools. Include browser/Chrome availability if present. Keep it concise.", note="toolsets requested")
+            reply = out or ("Hermes hat keine Werkzeugliste geliefert. "
+                            "Bitte HERMES_CMD und hermes tools list prüfen.")
+            return dict(message=None, reply=reply, note="Hermes-Werkzeuge angezeigt")
+        return dict(message=(
+            "Welche Hermes-Werkzeuge, Werkzeugsätze und externen Verbindungen sind "
+            "für mein aktives Profil verfügbar? Nenne auch den Browserstatus. "
+            "Antworte bitte auf Deutsch."
+        ), note="Werkzeugsätze abgefragt")
 
     if cmd == "connectors":
-        return dict(message=None, note="connector bridge explained", reply=(
-            "This dashboard does not need separate app wiring. It launches Hermes with your active profile, so any third-party app already connected in Hermes transfers here automatically.\n\n"
-            "Connect apps in Hermes itself with: hermes tools, hermes mcp, hermes gateway setup, or the relevant Hermes skill. Then restart this dashboard.\n\n"
-            "Use /tools or /toolsets here to see what the dashboard can currently reach."
+        return dict(message=None, note="Hermes-Verbindungen erläutert", reply=(
+            "Die JARVIS-Oberfläche verwendet dein bereits eingerichtetes Hermes-Profil. "
+            "Externe Dienste und MCP-Server werden in Hermes verbunden; "
+            "hier sind keine zweiten Zugangsdaten nötig.\n\n"
+            "Verwaltung in Hermes über hermes tools, hermes mcp und vorhandene Skills. "
+            "Danach /werkzeuge oder /werkzeugsaetze zur Übersicht verwenden."
         ))
 
     if cmd == "connect":
-        target = (arg or "third-party app").strip()
+        target = (arg or "einen externen Dienst").strip()
         return dict(message=(
-            f"Explain the correct Hermes-native way to connect {target} as a third-party app/tool. "
-            "Be generic: the dashboard should inherit whatever is connected to Hermes, not maintain separate credentials. "
-            "Include the relevant Hermes command family if known, like hermes tools, hermes mcp, hermes gateway setup, or a skill."
-        ), note=f"connector help: {target[:40]}")
+            f"Erkläre auf Deutsch, wie ich {target} mit dem bestehenden Hermes Agent "
+            "verbinden kann. Nenne nur tatsächlich vorhandene Hermes-Befehle, "
+            "MCP-Schnittstellen oder Skills. Keine zweite Anmeldung im Dashboard."
+        ), note=f"Verbindungshilfe: {target[:45]}")
 
     if cmd == "browser":
-        task = arg or "open or inspect Google Chrome using the configured Hermes browser/computer-use tools and report what is available"
-        return dict(message=f"Use my Hermes browser/Google Chrome tooling if available: {task}", note="browser mission armed")
+        task = arg or "prüfe, welche Browserwerkzeuge Hermes zur Verfügung stehen"
+        return dict(
+            message=f"Nutze die in Hermes vorhandenen Browserwerkzeuge, falls verfügbar: {task}",
+            note="Browserauftrag gestartet",
+        )
 
     if cmd == "profile":
         if not arg:
             facts = d["profile"]
-            return dict(message=None, reply=("\n".join(f"- {x}" for x in facts[-20:]) if facts else "I don't know anything about you yet."), note="profile read")
+            return dict(message=None,
+                        reply="\n".join(f"- {x}" for x in facts[-20:])
+                              if facts else "Hier sind noch keine zusätzlichen Profilnotizen gespeichert.",
+                        note="Profilnotizen angezeigt")
         update_state(lambda state: state["profile"].append(arg))
-        return dict(message=f'The user saved this dashboard profile note: "{arg}". Acknowledge in one short line.', note=f"profile += {arg[:50]}")
+        return dict(message=(
+            f'Der Nutzer hat diese zusätzliche Profilnotiz gespeichert: "{arg}". '
+            "Bestätige das kurz auf Deutsch."
+        ), note=f"Profilnotiz gespeichert: {arg[:50]}")
 
     if cmd == "goal":
-        if arg.lower() == "clear":
+        if arg.lower() in ("clear", "löschen", "loeschen"):
             update_state(lambda state: state.__setitem__("goal", ""))
-            return dict(message=None, reply="Standing objective cleared.", note="goal cleared")
+            return dict(message=None, reply="Dauerhaftes Ziel gelöscht.", note="Ziel gelöscht")
         if not arg or arg.lower() == "status":
-            return dict(message=None, reply=d["goal"] or "No standing objective set.", note="goal read")
+            return dict(message=None,
+                        reply=d["goal"] or "Noch kein dauerhaftes Ziel festgelegt.",
+                        note="Ziel angezeigt")
         update_state(lambda state: state.__setitem__("goal", arg))
-        return dict(message=f'The user set this standing objective: "{arg}". Acknowledge in one concise line.', note=f"goal set: {arg[:50]}")
+        return dict(message=(
+            f'Der Nutzer hat dieses dauerhafte Ziel festgelegt: "{arg}". '
+            "Bestätige es kurz auf Deutsch."
+        ), note=f"Ziel gespeichert: {arg[:50]}")
 
     if cmd == "personality":
         if not arg:
-            return dict(message=None, reply=d["personality"] or "Running default JARVIS persona.", note="persona read")
+            return dict(message=None,
+                        reply=d["personality"] or "Standardmäßiger JARVIS-Tonfall aktiv.",
+                        note="Tonfall angezeigt")
         update_state(lambda state: state.__setitem__("personality", arg))
-        return dict(message=f'Tone overlay changed to: "{arg}". Reply in one short line using that tone.', note=f"persona: {arg[:50]}")
+        return dict(message=(
+            f'Der Nutzer wünscht diesen Tonfall: "{arg}". '
+            "Bestätige die Änderung mit einem kurzen deutschen Satz."
+        ), note=f"Tonfall geändert: {arg[:50]}")
 
     if cmd in ("kanban", "mission", "missions"):
         if arg:
             update_state(lambda state: state["tasks"].append(
                 {"text": arg, "done": False, "at": time.time()}))
-            return dict(message=f'Added to the mission queue: "{arg}". Confirm in one short line.', note=f"mission += {arg[:50]}")
-        open_t = [t["text"] for t in d["tasks"] if not t.get("done")]
-        if not open_t:
-            return dict(message=None, reply="Mission queue is empty.", note="queue read")
-        return dict(message=None, reply="Mission queue:\n" + "\n".join(f"- {t}" for t in open_t), note=f"queue read ({len(open_t)})")
+            return dict(message=(
+                f'Eintrag zur JARVIS-Auftragsliste hinzugefügt: "{arg}". '
+                "Bestätige die Aufnahme kurz auf Deutsch."
+            ), note=f"Aufgabe gespeichert: {arg[:50]}")
+        open_tasks = [t["text"] for t in d["tasks"] if not t.get("done")]
+        if not open_tasks:
+            return dict(message=None, reply="Die Auftragsliste ist leer.", note="Auftragsliste leer")
+        return dict(message=None,
+                    reply="Offene Aufgaben:\n" + "\n".join(f"- {t}" for t in open_tasks),
+                    note=f"Aufgaben angezeigt: {len(open_tasks)}")
 
     if cmd == "background":
         if not arg:
-            return dict(message=None, reply="Give me a mission.", note="background empty")
+            return dict(message=None, reply="Bitte nenne einen konkreten Auftrag.",
+                        note="Auftrag fehlt")
         if runner is None:
-            return dict(message=None, reply="Background missions aren't available.", note="background unavailable")
+            return dict(message=None, reply="Hintergrundaufträge sind nicht verfügbar.",
+                        note="Hintergrund nicht verfügbar")
         jid = start_background(arg, runner)
-        return dict(message=None, reply=f"Background Hermes mission {jid} launched. I'll report when it lands.", note=f"mission {jid} started: {arg[:50]}")
+        return dict(message=None,
+                    reply=f"Hermes-Hintergrundauftrag {jid} gestartet. "
+                          "Der Abschluss wird im Dashboard gemeldet.",
+                    note=f"Auftrag gestartet: {arg[:50]}")
 
     return None
