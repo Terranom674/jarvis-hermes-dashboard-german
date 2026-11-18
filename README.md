@@ -1,185 +1,87 @@
-# JARVIS · Hermes Agent Mission Control
+# JARVIS · Hermes Mission Control (Deutsch)
 
-A local, voice-enabled JARVIS dashboard for [Hermes Agent](https://github.com/NousResearch/hermes-agent). It is a visual interface over your existing Hermes profile—not a second agent runtime—so it inherits the same tools, skills, memory, browser automation, MCP servers, and third-party integrations.
+Deutsche Weiterentwicklung des [JARVIS Hermes Dashboards](https://github.com/Itsme23476/jarvis-hermes-dashboard) (MIT-Lizenz). Dieses Dashboard ist **eine Oberfläche für den bestehenden Hermes Agent**, keine zweite KI-Installation.
 
-![JARVIS Hermes dashboard](docs/screenshot.png)
+## Änderungen dieser Version
 
-## What you get
+- Deutschsprachige Bedienoberfläche, Meldungen und Sprachsteuerung
+- Deutsche Browser-Spracherkennung (`de-DE`) als Ausweichmöglichkeit
+- Direkter Zugriff auf die **bereits eingerichteten Hermes-STT/TTS-Provider**, wenn die Hermes-Quellumgebung vorhanden ist
+- Beispiel: lokales Faster-Whisper für Spracheingabe und Edge TTS mit der in Hermes eingestellten Stimme
+- Kein ElevenLabs-Konto und kein gesonderter API-Schlüssel erforderlich, sofern Hermes-Sprachdienste funktionieren
+- Bestehende Hermes-CLI, Werkzeuge, Profile, Erinnerungen und Skills bleiben erhalten
+- Die Originaloberfläche (rotierende JARVIS-Kernanzeige) bleibt erhalten
 
-- Futuristic browser-based mission-control HUD
-- Natural conversational replies with a concise JARVIS voice persona
-- Continuous voice conversation: listen → transcribe → answer → speak → listen
-- Optional ElevenLabs speech-to-text and text-to-speech
-- Browser speech fallback when ElevenLabs is not configured
-- Working command matrix and slash commands
-- Hermes session continuity across voice turns
-- Access to the active Hermes profile's tools, skills, browser, memory, and MCP integrations
-- Local-only HTTP server bound to `127.0.0.1`
+## Voraussetzungen
 
-## Prerequisites
+- Linux oder macOS mit Python 3, Bash und Git
+- Ein bereits eingerichteter [Hermes Agent](https://github.com/NousResearch/hermes-agent) und funktionierendes `hermes chat`
+- Für Hermes-STT/TTS die offizielle Hermes-Quellinstallation mit `scripts/run-in-hermes-env`
+- Für Mikrofonbetrieb ein Browser mit `MediaRecorder`/AudioContext und ein sicherer Browserkontext (`localhost` oder HTTPS)
+- Für lokale Faster-Whisper-Spracherkennung: in Hermes installierter Whisper-Zusatz und konfiguriertes `stt.provider=local`
+- Für Edge-TTS: korrekt eingerichtete Hermes-TTS-Konfiguration
 
-1. macOS or Linux with Python 3 and a modern Chromium browser.
-2. Hermes Agent installed and configured:
-
-```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
-hermes setup
-```
-
-Confirm that `hermes chat -q "Say online"` works before installing the dashboard.
-
-## One-command install
+## Installation (erst nach Sicherung und Prüfung)
 
 ```bash
-git clone https://github.com/Itsme23476/jarvis-hermes-dashboard.git && \
-cd jarvis-hermes-dashboard && \
+git clone https://github.com/Terranom674/jarvis-hermes-dashboard-german.git
+cd jarvis-hermes-dashboard-german
 ./install.sh
 ```
 
-The installer creates a private `.env` file, starts the dashboard, and opens:
+Der Installer erzeugt `.env` aus `.env.example` und startet das Dashboard auf **127.0.0.1:8730**. Der Browser öffnet sich auf dem Server nicht automatisch (`JARVIS_OPEN=0`).
 
-<http://127.0.0.1:8730>
-
-No API keys are required for the basic dashboard. Browser speech APIs are used as a fallback.
-
-## One-prompt installation with Hermes
-
-Give this prompt to an already-installed Hermes Agent:
-
-> Install and launch the JARVIS dashboard from https://github.com/Itsme23476/jarvis-hermes-dashboard. Clone or update it under ~/jarvis-hermes-dashboard, preserve any existing private .env file, run its installer, verify http://127.0.0.1:8730/api/status reports the Hermes runtime, and tell me the local dashboard URL. Do not print or expose any credentials.
-
-Hermes can perform the clone, setup, launch, and health check with its terminal tools.
-
-## Voice setup
-
-Voice works without configuration when the browser provides SpeechRecognition and speechSynthesis. For more reliable speech, add an ElevenLabs key to the private `.env` file:
+Für eine lokale SSH-Verbindung vom gewünschten Endgerät aus kann der Port per SSH-Tunnel weitergeleitet werden:
 
 ```bash
-ELEVENLABS_API_KEY=your_private_key
-ELEVENLABS_VOICE_ID=JBFqnCBsd6RMkjVDRZzb
-ELEVENLABS_MODEL=eleven_turbo_v2_5
+ssh -N -L 8730:127.0.0.1:8730 jarvis@192.168.51.102
 ```
 
-Restart the dashboard after editing `.env`. The key stays server-side and is never sent to frontend JavaScript.
+Anschließend im Browser auf dem Endgerät `http://127.0.0.1:8730` aufrufen. **Nicht direkt ins Internet stellen.** Der HTTP-Server akzeptiert absichtlich nur localhost und besitzt keine vollständige Benutzeranmeldung; Reverse-Proxy-Zugriff erfordert eine separate, abgesicherte Planung und entsprechende Anpassungen.
 
-## Hermes profile and tools
+## Sprache
 
-The dashboard uses the `default` Hermes profile unless overridden:
+Die Sprachauswahl erfolgt auf dem Server in `.env`:
 
-```bash
-HERMES_PROFILE=work ./start.sh
-```
-
-If Hermes is installed at a nonstandard location:
-
-```bash
-HERMES_CMD="/absolute/path/to/hermes" ./start.sh
-```
-
-Third-party applications are connected in Hermes itself—not separately in this dashboard. Typical setup paths are:
-
-```bash
-hermes skills browse       # Gmail, Notion, Airtable, Google Workspace, etc.
-hermes tools               # built-in toolsets
-hermes mcp list            # external MCP servers
-hermes gateway setup       # Telegram, Slack, Discord, WhatsApp, etc.
-```
-
-After changing Hermes tools or integrations, restart the dashboard or use `/new`.
-
-## Command Matrix
-
-Every button executes its base command immediately. Commands that accept a payload stay armed so the next typed or spoken phrase becomes `/command payload`.
-
-| Command | Action |
+| Option | Wirkung |
 |---|---|
-| `/new` | Start a fresh Hermes thread |
-| `/goal <text\|status\|clear>` | Set, read, or clear the standing objective |
-| `/tools` | Run `hermes tools list` |
-| `/browser <task>` | Ask Hermes to use its browser/Chrome tools |
-| `/background <mission>` | Run a background Hermes mission |
-| `/mission [task]` | Read or add to the local mission queue |
-| `/personality <tone>` | Read or change the JARVIS tone overlay |
-| `/commands` | Show all dashboard commands |
-| `/toolsets` | Summarize enabled Hermes toolsets |
-| `/connectors` | Explain integration inheritance |
-| `/connect <name>` | Request Hermes-native connection guidance |
-| `/status` | Show runtime/profile/voice status |
+| `JARVIS_AUDIO_BACKEND=auto` | Bevorzugt Hermes-STT/TTS, wenn die Hermes-Quellumgebung gefunden wird |
+| `JARVIS_AUDIO_BACKEND=hermes` | Verwende Hermes, sofern verfügbar; sonst wird auf ElevenLabs/Browser zurückgegriffen |
+| `JARVIS_AUDIO_BACKEND=browser` | Browser-Spracherkennung und Browserstimmen |
+| `JARVIS_AUDIO_BACKEND=elevenlabs` | ElevenLabs mit gesondertem API-Schlüssel, andernfalls Browser |
 
-Normal text and voice requests go directly to Hermes Agent.
+Der Standardpfad zum vorhandenen Hermes-Quellcode lautet:
 
-## Architecture
-
-```text
-Browser HUD
-  ├─ microphone → browser MediaRecorder → ElevenLabs STT (optional)
-  ├─ POST /api/run → Python NDJSON server
-  ├─ Hermes CLI quiet mode → active Hermes profile and tools
-  └─ response → ElevenLabs TTS or browser speech synthesis
+```ini
+JARVIS_HERMES_SOURCE=~/.hermes/hermes-agent
 ```
 
-Key files:
+Eine abweichende Laufzeit kann über `JARVIS_HERMES_RUNNER` angegeben werden. Die Hermes-Audiobrücke verwendet dieselben Providerfunktionen wie die offizielle Hermes-Audio-API: `tools.voice_mode.transcribe_recording` und `tools.tts_tool.text_to_speech_tool`. Sie verändert **keine** Hermes-Konfigurationsdateien.
 
-```text
-server.py       local HTTP API and NDJSON streaming
-runtime.py      Hermes CLI subprocess and session continuity
-commands.py     dashboard slash commands and mission queue
-voice.py        optional ElevenLabs STT/TTS proxy
-persona.md      concise spoken JARVIS persona
-ui/             dependency-free HTML/CSS/JavaScript HUD
-install.sh      first-run setup and launch
-start.sh        local launcher
-```
+**Wichtig:** Das Vorhandensein der Hermes-Quellumgebung bedeutet noch nicht, dass das STT/TTS-Backend einsatzbereit ist. Erst der Sprachtest auf dem konkreten Server bestätigt, dass die installierten Modelle, Python-Pakete und Audioformate funktionieren.
 
-## Security
+Wenn Hermes-Audio verwendet wird, wird der Ton als HTTP-Antwort an den Browser übertragen und dort abgespielt. Eine Tonausgabe am Server ist dafür nicht erforderlich. Wird die Browser-Sprachfunktion verwendet, hängt die Verfügbarkeit von Browser und dort installierten Stimmen ab.
 
-- The server binds only to `127.0.0.1`; it is not exposed to the network.
-- Every state-changing API request requires a per-launch random token, same-origin request, valid localhost host header, approved content type, and bounded request size.
-- Agent runs are serialized so multiple tabs cannot race the shared Hermes session.
-- Raw prompt logging is disabled unless `JARVIS_RAW_LOG` is explicitly configured; opt-in logs are created with mode `0600` and symlink protection.
-- `.env`, state files, Python caches, and local credentials are ignored by Git.
-- The dashboard never bundles Google, Zapier, Gmail, ElevenLabs, or Hermes credentials.
-- Connected apps remain owned and authenticated by the user's Hermes profile.
-- Review third-party skills and MCP servers before installing them.
+## Sicherheit und Grenzen
 
-## Manual start
+- HTTP auf `127.0.0.1:8730` beschränkt; keine öffentlich erreichbare Portfreigabe
+- API-Token wird pro Serverstart erstellt; **kein** Ersatz für einen vorgeschalteten sicheren Login
+- Keine automatische Änderung von Berechtigungen, Tools oder Hermes-Gedächtnis
+- Keine verifizierte native Mobilansicht: Die originale Drei-Spalten-Darstellung ist für große Bildschirme optimiert
+- Bisher kein fertiger systemd-Dienst enthalten
+- Der zusätzliche Hermes-Audio-Worker wird pro Sprachauftrag gestartet; das kann die erste Antwort verzögern
+- Vor Veröffentlichung müssen Sprachintegration und Hermes-CLI-Parameter im Zielsystem geprüft werden
 
-```bash
-cd ~/jarvis-hermes-dashboard
-./start.sh
-```
+## Wesentliche Dateien
 
-To use another port:
+- `ui/index.html`, `ui/app.js`, `ui/styles.css`: Oberfläche, Browserdialog und Darstellung
+- `server.py`: Dashboard-HTTP-Server mit eigenen Endpunkten
+- `runtime.py`: Übergibt Aufträge an die vorhandene Hermes-CLI
+- `hermes_audio.py`: Brücke zur vorhandenen Hermes-Sprachumgebung
+- `hermes_audio_worker.py`: STT/TTS-Ausführung mit Hermes-Providerfunktionen
+- `voice.py`: optionaler ElevenLabs-Provider
+- `persona.md`: ergänzender JARVIS-Tonfall
 
-```bash
-JARVIS_PORT=9000 ./start.sh
-```
+## Lizenz und Herkunft
 
-## Troubleshooting
-
-### Hermes is not found
-
-```bash
-which hermes
-hermes doctor
-```
-
-Then set `HERMES_CMD` in `.env` if needed.
-
-### Microphone does not activate
-
-Allow microphone access for `127.0.0.1` in the browser's site settings. ElevenLabs is optional; without it, use a browser that supports Web Speech APIs.
-
-### A newly connected tool is missing
-
-Start a fresh session after changing Hermes tools:
-
-```bash
-hermes tools list
-```
-
-Then restart the dashboard and click `/new`.
-
-## Credits and license
-
-Originally inspired by [`Itsme23476/jarvis-os`](https://github.com/Itsme23476/jarvis-os), redesigned and adapted to use Hermes Agent as its runtime. Released under the MIT License; see [LICENSE](LICENSE).
+Projektbasis: [Itsme23476/jarvis-hermes-dashboard](https://github.com/Itsme23476/jarvis-hermes-dashboard), MIT-Lizenz. Die Lizenzdatei bleibt erhalten.
