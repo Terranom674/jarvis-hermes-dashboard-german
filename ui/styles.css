@@ -72,3 +72,46 @@ body{background:radial-gradient(1000px 620px at 52% 18%,rgba(9,91,112,.42),trans
   .miniBtns { grid-template-columns:1fr 1fr; }
   .brandmark { margin-bottom:14px; }
 }
+
+/* Zentrale, zusammenhängende Chat-Eingabe direkt bei der JARVIS-Antwort. */
+[hidden]{display:none!important}
+.center{min-width:0;overflow-y:auto;overflow-x:hidden}
+.center .uplink.composer{margin:0;flex:0 0 auto;width:100%;max-width:780px;padding:15px 18px 13px;border-radius:22px}
+.composer-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.composer-head .lbl{font-size:11px}
+.composer-hint{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:0}
+.composer .composer-field{display:flex;gap:9px;align-items:stretch;padding:6px;border-radius:16px;margin-top:11px}
+.composer #input{min-width:0;flex:1;width:auto;min-height:78px;max-height:190px;resize:vertical;font-size:14px;line-height:1.5;color:var(--ink);padding:11px 13px}
+.composer #input::placeholder{color:var(--mut);opacity:.85}
+.composer-buttons{display:flex;flex:0 0 120px;flex-direction:column;gap:7px}
+.composer-buttons .ctl{flex:1;min-width:0;font-size:11px;white-space:nowrap}
+.composer-buttons .ctl.run{min-width:0}
+.composer .tip{margin-top:9px;font-size:10px;letter-spacing:.02em}
+.composer .voice-warning{margin:9px 0 0;padding:8px 11px;font:11px/1.5 var(--mono);color:var(--amber);border:1px solid rgba(255,182,72,.24);background:rgba(255,182,72,.06);border-radius:10px}
+.center .missionbar{flex:0 0 auto;flex-wrap:wrap;justify-content:center;gap:8px}
+.center .missionbar .ctl{flex:1 1 auto}
+#logout{color:var(--dim)}
+#logout:hover{color:var(--ink)}
+@media(max-height:850px) and (min-width:1101px){
+  .topbar{height:125px;grid-template-columns:95px minmax(0,1fr) minmax(350px,480px)}
+  .mega{font-size:64px}
+  .sigil{width:80px;height:80px}
+  .hud{height:calc(100% - 125px)}
+  .reactor{width:min(33vh,345px)}
+}
+@media(max-width:1100px){
+  .center{overflow:visible}
+  .center .uplink.composer{margin-top:0;padding:14px}
+  .composer-buttons{flex-basis:120px}
+  .composer-hint{font-size:9px}
+}
+@media(max-width:640px){
+  .center .uplink.composer{padding:12px}
+  .composer .composer-field{flex-direction:column}
+  .composer #input{width:100%;min-height:74px}
+  .composer-buttons{flex:0 0 auto;flex-direction:row}
+  .composer-buttons .ctl{min-height:44px}
+  .composer-hint{font-size:9px;line-height:1.4}
+  .center .missionbar{gap:6px}
+  .center .missionbar .ctl{font-size:10px;min-height:40px}
+}
