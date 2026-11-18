@@ -15,10 +15,10 @@ def _print(result):
 
 
 def main():
-    if len(sys.argv) < 3 or sys.argv[1] not in ("stt", "tts"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("stt", "tts"):
         _print({"ok": False, "error": "Ungültiger Audioauftrag"})
         return 2
-    mode, value = sys.argv[1], sys.argv[2]
+    mode, value = sys.argv[1], sys.stdin.read()
     try:
         if mode == "stt":
             from tools.voice_mode import transcribe_recording
