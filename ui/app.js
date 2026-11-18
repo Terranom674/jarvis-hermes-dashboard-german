@@ -49,11 +49,9 @@ function log(kind, label, msg, jsonHtml){
   while (box.children.length > 40) box.removeChild(box.lastChild);
 }
 function usageBlock(u){
-  const row = (k,v) => `  <span class="k">"${k}"</span>: <span class="v">${v}</span>`;
-  return `{\n  <span class="k">"usage"</span>: {\n`
-    + [row('input_tokens', u.input_tokens), row('output_tokens', u.output_tokens),
-       row('total_tokens', u.total_tokens)].join(',\n')
-    + `\n  }\n}`;
+  const row = (k,v) => `<span class="k">${esc(k)}</span>: <span class="v">${Number(v)||0}</span>`;
+  return [row('Eingabe-Token', u.input_tokens), row('Ausgabe-Token', u.output_tokens),
+          row('Token gesamt', u.total_tokens)].join(' · ');
 }
 
 // ── the run ──
@@ -69,19 +67,19 @@ async function transmit(message, options = {}){
   }
   running = true; answer = ''; firstDelta = false; speakThisRun = options.speak !== false;
 
-  const fresh = /^\/new\b/.test(message.trim());
+  const fresh = /^\/(?:new|neu)\b/i.test(message.trim());
   const id = rid();
   setState('running', 'ARBEITET', id.slice(0,20) + '…');
   setTag('run', 'ARBEITET');
   $('#response').innerHTML = '<span class="cur"></span>';
-  log('run', 'RUN', `started ${id}; uplink cleared`);
+  log('run', 'START', `Anfrage ${id} gestartet`);
 
   // visible elapsed counter — a slow answer should never look like a dead screen
   const t0 = performance.now();
   const tick = setInterval(() => {
     if (!running) return;
     const s = ((performance.now()-t0)/1000).toFixed(1);
-    if (!answer) $('#strun').textContent = `thinking… ${s}s`;
+    if (!answer) $('#strun').textContent = `Denkt nach … ${s} s`;
   }, 200);
 
   try {
@@ -107,13 +105,13 @@ async function transmit(message, options = {}){
     }
   } catch (e){
     if (e?.name === 'AbortError'){
-      log('note', 'CANCEL', 'Auftrag abgebrochen');
-      setState('', 'BEREIT', 'cancelled');
+      log('note', 'ABBRUCH', 'Auftrag abgebrochen');
+      setState('', 'BEREIT', 'Abgebrochen');
       setTag('', 'BEREIT');
     } else {
-      log('error', 'ERROR', String(e).slice(0,200));
+      log('error', 'FEHLER', String(e).slice(0,200));
       setState('error', 'FEHLER', 'Verbindung unterbrochen');
-      setTag('err', 'ERROR');
+      setTag('err', 'FEHLER');
     }
   }
   activeController = null;
@@ -126,7 +124,7 @@ function handle(ev){
   switch (ev.t){
     case 'status':
       if (ev.session_id) sys('session', ev.session_id.slice(0,8));
-        const msg = `core online · Hermes tools=${ev.tools ?? 0} profile=${ev.profile||'default'} permission=${ev.permission||'normal'}`;
+        const msg = `Hermes verbunden · Werkzeuge: ${ev.tools ?? 0} · Profil: ${ev.profile||'Standard'} · Berechtigung: ${ev.permission||'normal'}`;
       log('status', 'STATUS', msg);
       break;
     case 'latency':
@@ -134,16 +132,16 @@ function handle(ev){
       break;
     case 'tool':
       if (ev.phase === 'use')
-        log('tool', 'TOOL', `→ ${ev.name}(${ev.input || ''})`);
+        log('tool', 'WERKZEUG', `→ ${ev.name}(${ev.input || ''})`);
       else
-        log('tool', 'TOOL', `✓ ${ev.ok===false?'error':'ok'}`);
+        log('tool', 'WERKZEUG', `✓ ${ev.ok===false?'Fehler':'OK'}`);
       break;
     case 'delta':
       answer += ev.text;
       renderAnswer();
       if (!firstDelta){
         firstDelta = true;
-        log('reason', 'REASONING', answer.slice(0, 220));
+        log('reason', 'ANTWORT', answer.slice(0, 220));
       }
       break;
     case 'usage':
@@ -152,21 +150,21 @@ function handle(ev){
     case 'complete':
       setState('done', 'FERTIG', (ev.ms!=null?`${ev.ms}ms`:'') );
       setTag('done', 'FERTIG');
-      log('complete', 'FERTIG', ev.ms!=null?`run completed in ${ev.ms}ms`:'Auftrag abgeschlossen');
+      log('complete', 'FERTIG', ev.ms!=null?`Abgeschlossen nach ${ev.ms} ms`:'Auftrag abgeschlossen');
       renderAnswer(true);
       speakDone = speakThisRun ? speak(answer) : Promise.resolve();
       break;
     case 'error':
-      setState('error', 'FEHLER', ev.message?.slice(0,40) || 'error');
+      setState('error', 'FEHLER', ev.message?.slice(0,40) || 'Fehler');
       setTag('err', 'ERROR');
-      log('error', 'ERROR', ev.message || 'Unbekannter Fehler');
+      log('error', 'FEHLER', ev.message || 'Unbekannter Fehler');
       // show it in the panel too, so a failure isn't a silent empty box
       if (!answer) $('#response').innerHTML =
         `<span style="color:var(--red)">⚠ ${esc(ev.message || 'Auftrag fehlgeschlagen.')}</span>`;
       else renderAnswer(true);
       break;
     case 'note':
-      log('note', 'NOTE', ev.message || '');
+      log('note', 'HINWEIS', ev.message || '');
       break;
   }
 }
@@ -255,7 +253,7 @@ async function micToggle(){
     try {
       micStream = await navigator.mediaDevices.getUserMedia(
         {audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true}});
-    } catch(e){ log('error','VOICE','Mikrofon gesperrt – bitte Browserberechtigung prüfen'); return; }
+    } catch(e){ log('error','SPRACHE','Mikrofon gesperrt – bitte Browserberechtigung prüfen'); return; }
     actx = new (window.AudioContext||window.webkitAudioContext)();
     await actx.resume();
     analyser = actx.createAnalyser(); analyser.fftSize = 1024;
@@ -270,12 +268,12 @@ async function micToggle(){
   if (SpeechRecognition){
     convo = true; suppress = false;
     $('#mic').classList.add('on'); $('#mic').textContent = '● Browser hört zu';
-    log('voice','VOICE','Browser-Spracherkennung aktiv – höre zu');
+    log('voice','SPRACHE','Browser-Spracherkennung aktiv – höre zu');
     setState('listening','HÖRT ZU','Browser-Spracherkennung aktiv');
     startBrowserRecognition();
     return;
   }
-  log('error','VOICE','Keine Spracherkennung verfügbar. Nutze einen unterstützten Browser.');
+  log('error','SPRACHE','Keine Spracherkennung verfügbar. Nutze einen unterstützten Browser.');
 }
 
 function stopConvo(){
@@ -288,8 +286,8 @@ function stopConvo(){
   if (micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
   if (actx){ actx.close().catch(()=>{}); actx=null; analyser=null; }
   document.body.classList.remove('speaking');
-  $('#mic').classList.remove('on'); $('#mic').textContent = '◉ VOICE';
-  log('voice','VOICE','Sprachdialog beendet');
+  $('#mic').classList.remove('on'); $('#mic').textContent = '◉ Sprachdialog';
+  log('voice','SPRACHE','Sprachdialog beendet');
   setState('', 'BEREIT', 'warte auf Eingabe');
 }
 
@@ -309,24 +307,24 @@ function startBrowserRecognition(){
       else interim += txt;
     }
     const shown = (finalText || interim || '').trim();
-    if (shown) $('#strun').textContent = 'HEARD: ' + shown.slice(0,42);
+    if (shown) $('#strun').textContent = 'ERKANNT: ' + shown.slice(0,42);
   };
-  recognition.onerror = e => log('error','VOICE',`browser speech: ${e.error || 'error'}`);
+  recognition.onerror = e => log('error','SPRACHE',`Browser-Spracherkennung: ${e.error || 'Fehler'}`);
   recognition.onend = async () => {
     const text = finalText.trim();
     if (!convo) return;
     if (!text){ if (!suppress) setTimeout(startBrowserRecognition, 250); return; }
-    log('voice','VOICE',`browser transcribed: "${text}"`);
+    log('voice','SPRACHE',`Im Browser erkannt: "${text}"`);
     const armed = $('#input').dataset.cmd || '';
     const full = (armed ? armed + ' ' : '') + text;
     $('#input').value = ''; disarm();
-    log('send','SEND',`auto-sent voice: ${full}`);
+    log('send','GESENDET',`Gesprochene Anweisung: ${full}`);
     await transmit(full);
     suppress = false;
     if (convo) setTimeout(startBrowserRecognition, 350);
   };
   setState('listening','HÖRT ZU','Browser-Spracherkennung aktiv');
-  try{ recognition.start(); }catch(e){ log('error','VOICE','Spracherkennung konnte nicht gestartet werden'); }
+  try{ recognition.start(); }catch(e){ log('error','SPRACHE','Spracherkennung konnte nicht gestartet werden'); }
 }
 
 // ── one server-side ElevenLabs listening turn ──
@@ -346,11 +344,11 @@ function beginTurn(){
 function meter(rms){
   // live input bar in the reactor subtitle, so you can SEE it hearing you
   const n = Math.max(0, Math.min(14, Math.round(rms * 90)));
-  $('#strun').textContent = 'IN ' + '▮'.repeat(n) + '▯'.repeat(14 - n);
+  $('#strun').textContent = 'MIKROFON ' + '▮'.repeat(n) + '▯'.repeat(14 - n);
 }
 
 function endTurn(reason){
-  log('voice','VOICE',`${reason} · peak ${peak.toFixed(3)} · thr ${threshold.toFixed(3)}`);
+  log('voice','SPRACHE',`${reason} · Spitzenpegel ${peak.toFixed(3)} · Schwelle ${threshold.toFixed(3)}`);
   try { recorder.stop(); } catch(_){}           // → ship()
 }
 
@@ -382,7 +380,7 @@ function vtick(){
 
   if (rms > threshold){
     loudAt = t;
-    if (!spoke){ spoke = true; log('voice','VOICE','Sprache erkannt'); }
+    if (!spoke){ spoke = true; log('voice','SPRACHE','Sprache erkannt'); }
   } else if (spoke && t - loudAt > SILENCE){
     return endTurn('Sprechpause');
   }
@@ -402,7 +400,7 @@ async function ship(){
     return;
   }
   setState('running','ERKENNT SPRACHE','…');
-  log('voice','VOICE',`uploading ${Math.round(blob.size/1024)}KB to server STT`);
+  log('voice','SPRACHE',`Übertrage ${Math.round(blob.size/1024)} KB zur Spracherkennung`);
   const t0 = performance.now();
   try {
     const response = await fetch('/api/listen', {method:'POST',
@@ -412,7 +410,7 @@ async function ship(){
     const text = (r.text||'').trim();
     const ms = Math.round(performance.now() - t0);
     if (!text){
-      log('voice','VOICE','Keine Sprache erkannt');
+      log('voice','SPRACHE','Keine Sprache erkannt');
       if (convo) beginTurn(); else setState('','BEREIT','Nichts gehört');
       return;
     }
@@ -437,12 +435,12 @@ function disarm(){
   document.querySelectorAll('.cmd').forEach(c=>c.classList.remove('armed'));
   $('#input').dataset.cmd = '';
 }
-const PAYLOAD_COMMANDS = new Set(['/goal','/browser','/background','/mission','/personality']);
+const PAYLOAD_COMMANDS = new Set(['/ziel','/browser','/hintergrund','/auftrag','/tonfall']);
 $('#cmds').addEventListener('click', e => {
   const b = e.target.closest('.cmd'); if (!b) return;
   const cmd = b.dataset.cmd;
   if (running){
-    log('note','BUSY',`${cmd} not sent — JARVIS is still working.`);
+    log('note','BESETZT',`${cmd} wurde nicht gesendet – Jarvis arbeitet noch.`);
     return;
   }
 
@@ -454,24 +452,24 @@ $('#cmds').addEventListener('click', e => {
     b.classList.add('armed');
     $('#input').dataset.cmd = cmd;
     $('#input').focus();
-    $('#tip').textContent = `${TIPS[cmd] || cmd} The command is live and remains armed for your next payload.`;
+    $('#tip').textContent = `${TIPS[cmd] || cmd} Der Befehl bleibt für die nächste Eingabe aktiviert.`;
   } else {
     $('#tip').textContent = defaultTip;
   }
-  log('command', 'COMMAND', `executing ${cmd} on Hermes backend`);
-  transmit(cmd, {speak: !['/tools','/commands'].includes(cmd)});
+  log('command', 'BEFEHL', `Starte ${cmd} über Hermes`);
+  transmit(cmd, {speak: !['/werkzeuge','/befehle'].includes(cmd)});
 });
 const TIPS = {
-  '/new':'Neues Gespräch beginnen und bisherigen Verlauf zurücksetzen.',
-  '/goal':'Dauerhaftes Ziel eingeben.',
-  '/tools':'Zeigt die Hermes-Werkzeuge des aktiven Profils.',
-  '/toolsets':'Zeigt aktive Werkzeugsätze und Verbindungen.',
-  '/browser':'Eine Browseraufgabe formulieren.',
-  '/background':'Einen Hintergrundauftrag formulieren.',
-  '/mission':'Aufträge ansehen oder hinzufügen.',
-  '/personality':'Den gewünschten Tonfall beschreiben.',
-  '/kanban':'Die Aufgabenliste abfragen.',
-  '/commands':'Alle verfügbaren Kurzbefehle anzeigen.'
+  '/neu': 'Ein neues Hermes-Gespräch beginnen.',
+  '/ziel': 'Ein dauerhaftes Ziel eingeben oder mit /ziel status ansehen.',
+  '/werkzeuge': 'Aktivierte Werkzeuge im Hermes-Profil anzeigen.',
+  '/werkzeugsaetze': 'Aktive Werkzeugsätze und externe Verbindungen anzeigen.',
+  '/browser': 'Einen Auftrag für den Browser formulieren.',
+  '/hintergrund': 'Einen Hintergrundauftrag formulieren.',
+  '/auftrag': 'Eine Aufgabe ergänzen oder die Auftragsliste ansehen.',
+  '/tonfall': 'Den gewünschten Tonfall beschreiben.',
+  '/aufgaben': 'Auftragsliste verwalten.',
+  '/befehle': 'Alle verfügbaren Kurzbefehle anzeigen.'
 };
 let defaultTip = '';
 
@@ -482,14 +480,14 @@ function sendFromInput(){
   if (!raw && !armed) return;
   const full = (armed && !raw.startsWith('/')) ? `${armed} ${raw}` : (raw || armed);
   $('#input').value = ''; disarm(); $('#tip').textContent = defaultTip;
-  log('send','SEND',`transmit: ${full}`);
+  log('send','GESENDET',`Anweisung: ${full}`);
   transmit(full);
 }
 $('#run').onclick = sendFromInput;
 $('#mic').onclick = micToggle;
-$('#showCommands').onclick = () => transmit('/commands', {speak:false});
-$('#missionBtn').onclick = () => transmit('/mission');
-$('#clearBtn').onclick = () => { answer=''; $('#response').innerHTML='<span class="rplaceholder">Display cleared. Standing by.</span>'; log('note','CLEAR','Antwortanzeige geleert'); };
+$('#showCommands').onclick = () => transmit('/befehle', {speak:false});
+$('#missionBtn').onclick = () => transmit('/auftrag');
+$('#clearBtn').onclick = () => { answer=''; $('#response').innerHTML='<span class="rplaceholder">Anzeige geleert. Jarvis ist bereit.</span>'; log('note','LEEREN','Antwortanzeige geleert'); };
 document.querySelectorAll('[data-quick]').forEach(b => b.onclick = () =>
   transmit(b.dataset.quick, {speak:false}));
 document.addEventListener('keydown', e => {
@@ -523,8 +521,8 @@ setInterval(async () => {
   try {
     const j = await fetch('/api/jobs', {headers:apiHeaders()}).then(r => r.json());
     for (const d of (j.done || [])){
-      log('complete','MISSION', `${d.mission} → ${(d.result||'').slice(0,200)}`);
-      if (!running) speak(`Mission complete. ${(d.result||'').slice(0,300)}`);
+      log('complete','AUFTRAG', `${d.mission} → ${(d.result||'').slice(0,200)}`);
+      if (!running) speak(`Auftrag abgeschlossen. ${(d.result||'').slice(0,300)}`);
     }
   } catch(_){}
 }, 4000);
@@ -546,15 +544,15 @@ setInterval(async () => {
     sys('profile', s.profile || 'default');
     sys('runtime', s.runtime || '—', s.runtime === 'hermes' ? 'ok' : 'warn');
     sys('clock', now());
-    $('#top-gw').textContent = `Gateway: online ${location.origin}`;
+    $('#top-gw').textContent = `Verbindung: erreichbar (${location.origin})`;
     $('#top-profile').textContent = 'Profil: ' + (s.profile || 'default');
     $('#top-voice').textContent = 'Sprache: ' + (s.stt === 'hermes' ? 'Hermes STT' : s.stt) + ' / ' + (s.tts === 'hermes' ? 'Hermes TTS' : s.tts);
     const tools = (s.tools || []).slice(0, 12);
-    $('#toolsList').innerHTML = tools.length ? tools.map(t => `<span class="chip">${esc(t)}</span>`).join('') : '<span class="chip ghost">Hermes tool list unavailable — set HERMES_CMD if needed</span>';
+    $('#toolsList').innerHTML = tools.length ? tools.map(t => `<span class="chip">${esc(t)}</span>`).join('') : '<span class="chip ghost">Hermes-Werkzeuge nicht abrufbar – HERMES_CMD prüfen</span>';
 
-    log('status', 'BOOT',
-        `gateway online · ${s.runtime} core · profile=${s.profile || 'default'} · permission=${s.permission}`);
-    log('voice', 'VOICE', `Sprachkanal bereit – ${s.stt} / ${s.tts}`);
+    log('status', 'START',
+        `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigung: ${s.permission}`);
+    log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${s.stt}, Ausgabe: ${s.tts}`);
     $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprache');
     setState('', 'BEREIT', 'warte auf Eingabe');
   } catch(e){
