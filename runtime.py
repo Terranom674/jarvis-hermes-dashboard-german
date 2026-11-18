@@ -1,17 +1,9 @@
-"""
-Hermes runtime for the JARVIS HUD.
+"""Hermes-Laufzeit für die deutschsprachige JARVIS-Oberfläche.
 
-This dashboard is a face on Hermes Agent, not Claude Code. It launches the
-Hermes CLI with the selected profile/source so Hermes keeps access to the same
-configured toolsets, MCP servers, browser automation, Google integrations,
-third-party tools, skills, memory, and gateway features that are available to the
-normal Hermes agent.
-
-Set HERMES_CMD when your shell exposes Hermes under a custom command/path, e.g.
-  HERMES_CMD="/path/to/hermes"
-or
-  HERMES_CMD="python3 -m hermes_cli.main"
+Verwendet die installierte Hermes-CLI mit dem bestehenden Profil, Gedächtnis
+und denselben Werkzeugen. Es wird kein zweiter Agent eingerichtet.
 """
+
 import collections
 import json
 import os
@@ -49,7 +41,7 @@ _ACTIVE_LOCK = threading.Lock()
 
 
 def cancel_active():
-    """Terminate the currently running Hermes child process, if any."""
+    """Laufenden Hermes-Prozess bei Nutzerabbruch beenden."""
     with _ACTIVE_LOCK:
         proc = _ACTIVE_PROC
     if proc is None or proc.poll() is not None:
@@ -106,10 +98,11 @@ def build_command(message, session_id=None, system=None):
     # current request into one explicit turn so the model answers as JARVIS
     # instead of narrating its CLI/runtime. Quiet mode removes the Hermes banner.
     prompt = message
-    if system:
-        prompt = (f"{system}\n\n## Current user request\n{message}\n\n"
-                  "Answer the request now. Return only the words JARVIS should say aloud; "
-                  "never include session IDs, runtime metadata, headings, or process narration.")
+    if system and not valid_session(session_id):
+        prompt = (f"{system}\n\n## Aktuelle Nutzeranfrage\n{message}\n\n"
+                  "Antworte auf Deutsch, sofern keine andere Sprache gewünscht ist. "
+                  "Erwähne keine internen Sitzungskennungen oder Laufzeitinformationen. "
+                  "Beantworte komplexe Fragen vollständig statt sie auf wenige Sätze zu kürzen.")
     cmd = _hermes_base() + ["chat", "-Q", "-q", prompt, "--source", SOURCE]
     if valid_session(session_id):
         cmd += ["--resume", str(session_id)]
@@ -126,7 +119,7 @@ def build_command(message, session_id=None, system=None):
 
 
 def hermes_tools_snapshot(limit=36):
-    """Return a compact list of enabled/visible Hermes toolsets/tools for UI status."""
+    """Kurze Übersicht der sichtbaren Hermes-Werkzeuge für die Oberfläche."""
     try:
         base = _hermes_base()
         proc = subprocess.run(base + ["tools", "list"], cwd=WORKDIR, text=True,
@@ -156,7 +149,7 @@ def _run_hermes_locked(message, session_id=None, system=None):
     global _ACTIVE_PROC
     started = _mono_ms()
     cmd = build_command(message, session_id, system)
-    yield dict(t="status", model=MODEL or "Hermes default", tools=len(hermes_tools_snapshot()),
+    yield dict(t="status", model=MODEL or "Hermes-Standardmodell", tools=len(hermes_tools_snapshot()),
                mcp=[], permission=PERMISSION, profile=PROFILE, runtime="hermes",
                session_id=session_id)
 
@@ -178,7 +171,7 @@ def _run_hermes_locked(message, session_id=None, system=None):
         with _ACTIVE_LOCK:
             _ACTIVE_PROC = proc
     except FileNotFoundError:
-        raise RuntimeError("Hermes CLI not found. Set HERMES_CMD to your Hermes executable.")
+        raise RuntimeError("Hermes-CLI nicht gefunden. Bitte HERMES_CMD auf die vorhandene Hermes-Datei setzen.")
 
     q = collections.deque()
     lock = threading.Lock()
@@ -233,7 +226,7 @@ def _run_hermes_locked(message, session_id=None, system=None):
                 if time.monotonic() - last > IDLE_TIMEOUT:
                     proc.kill()
                     err = " | ".join(list(errbuf)[-3:])
-                    yield dict(t="error", message=(f"Hermes went quiet for {IDLE_TIMEOUT}s and was stopped. " + err)[:400])
+                    yield dict(t="error", message=(f"Hermes hat innerhalb von {IDLE_TIMEOUT} Sekunden nicht geantwortet und wurde gestoppt. " + err)[:400])
                     return
                 time.sleep(0.05)
                 continue
@@ -265,10 +258,10 @@ def _run_hermes_locked(message, session_id=None, system=None):
                 emitted_session = session_match.group(1)
         if rc != 0:
             err = " | ".join(list(errbuf)[-6:])
-            yield dict(t="error", message=(err or f"Hermes exited with code {rc}")[:500])
+            yield dict(t="error", message=(err or f"Hermes wurde mit Fehlercode {rc} beendet.")[:500])
             return
         if not text_seen:
-            yield dict(t="delta", text="Hermes completed without textual output.")
+            yield dict(t="delta", text="Hermes hat den Auftrag ohne Textantwort beendet.")
         yield dict(t="complete", session_id=emitted_session or session_id,
                    ms=_mono_ms() - started)
     finally:
@@ -286,9 +279,9 @@ def _run_hermes_locked(message, session_id=None, system=None):
 
 def run_mock(message, session_id=None, system=None):
     ok, detail = _can_launch_hermes()
-    yield dict(t="error", message=("Hermes is not reachable from this dashboard process. "
-                                  "Set HERMES_CMD or start from a shell where `hermes` works. "
-                                  f"Diagnostic: {detail[:240]}"))
+    yield dict(t="error", message=("Hermes ist aus dem Dashboard nicht erreichbar. "
+                                  "Bitte HERMES_CMD oder den Hermes-Aufruf des Servicebenutzers prüfen. "
+                                  f"Diagnose: {detail[:240]}"))
 
 
 def run(message, session_id=None, system=None):
@@ -298,4 +291,4 @@ def run(message, session_id=None, system=None):
     try:
         yield from run_hermes(message, session_id, system)
     except Exception as e:  # noqa: BLE001
-        yield dict(t="error", message=f"could not start Hermes core: {e}")
+        yield dict(t="error", message=f"Hermes-Kern konnte nicht gestartet werden: {e}")
