@@ -4,8 +4,8 @@ Verwendet das vorhandene Hermes-Profil mit Gedächtnis, Skills und Werkzeugen.
 Die Sprachdienste werden bevorzugt direkt aus der Hermes-Konfiguration geladen.
 """
 
-import base64
-import binascii
+import hashlib
+import hmac
 import json
 import mimetypes
 import os
@@ -13,8 +13,10 @@ import pathlib
 import secrets
 import sys
 import threading
+import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.cookies import SimpleCookie, CookieError
 from urllib.parse import urlparse
 
 ROOT = pathlib.Path(__file__).resolve().parent
@@ -38,8 +40,15 @@ PORT = int(os.environ.get("JARVIS_PORT", "8730"))
 BIND = os.environ.get("JARVIS_BIND", "127.0.0.1").strip()
 PUBLIC_URL = os.environ.get("JARVIS_PUBLIC_URL", f"http://{BIND}:{PORT}").rstrip("/")
 PUBLIC_ORIGIN = urlparse(PUBLIC_URL)
-ACCESS_USER = os.environ.get("JARVIS_ACCESS_USER", "jarvis")
 ACCESS_PASSWORD = os.environ.get("JARVIS_ACCESS_PASSWORD", "")
+COOKIE_NAME = "jarvis_anmeldung"
+COOKIE_LIFETIME = 30 * 24 * 60 * 60
+COOKIE_SECRET = hashlib.pbkdf2_hmac(
+    "sha256", ACCESS_PASSWORD.encode("utf-8"),
+    b"jarvis-session-v1", 150_000
+) if ACCESS_PASSWORD else b""
+LOGIN_ATTEMPTS = {}
+LOGIN_LOCK = threading.Lock()
 if BIND not in ("127.0.0.1", "localhost", "::1") and not ACCESS_PASSWORD:
     raise RuntimeError("Netzwerkzugriff braucht JARVIS_ACCESS_PASSWORD in der .env.")
 if PUBLIC_ORIGIN.scheme not in ("http", "https") or not PUBLIC_ORIGIN.netloc or PUBLIC_ORIGIN.path not in ("", "/"):
@@ -112,41 +121,94 @@ class Handler(BaseHTTPRequestHandler):
 
     def _host_ok(self):
         host = self.headers.get("Host", "")
-        return host in {f"127.0.0.1:{PORT}", f"localhost:{PORT}", PUBLIC_ORIGIN.netloc}
+        return host in {
+            f"127.0.0.1:{PORT}", f"localhost:{PORT}",
+            f"{BIND}:{PORT}", PUBLIC_ORIGIN.netloc,
+        }
 
     def _origin_ok(self):
         origin = self.headers.get("Origin")
         return origin in {
             f"http://127.0.0.1:{PORT}", f"http://localhost:{PORT}",
+            f"http://{BIND}:{PORT}",
             f"{PUBLIC_ORIGIN.scheme}://{PUBLIC_ORIGIN.netloc}",
         }
 
+    def _session_signature(self, expiry):
+        return hmac.new(COOKIE_SECRET, str(expiry).encode("ascii"),
+                        hashlib.sha256).hexdigest()
+
     def _authorized(self):
-        """Im Netzwerk alle Inhalte und API-Zugriffe mit Passwort schützen."""
+        """Nur ein signiertes, zeitlich begrenztes Geräte-Cookie autorisiert."""
         if not ACCESS_PASSWORD:
-            return True  # Nur lokale Bindung ohne Passwort zulässig.
-        header = self.headers.get("Authorization", "")
-        if not header.startswith("Basic "):
-            return False
+            return True  # Ausschließlich für lokale Bindung zulässig.
         try:
-            username, password = base64.b64decode(header[6:], validate=True).decode("utf-8").split(":", 1)
-        except (binascii.Error, UnicodeDecodeError, ValueError):
+            cookies = SimpleCookie()
+            cookies.load(self.headers.get("Cookie", ""))
+            morsel = cookies.get(COOKIE_NAME)
+            if morsel is None:
+                return False
+            expiry_text, signature = morsel.value.split(".", 1)
+            expiry = int(expiry_text)
+            if expiry < time.time() or expiry > time.time() + COOKIE_LIFETIME:
+                return False
+            return secrets.compare_digest(signature, self._session_signature(expiry))
+        except (ValueError, TypeError, CookieError):
             return False
-        return (secrets.compare_digest(username, ACCESS_USER) and
-                secrets.compare_digest(password, ACCESS_PASSWORD))
+
+    def _cookie_header(self, token, lifetime):
+        secure = (PUBLIC_ORIGIN.scheme == "https" and
+                  self.headers.get("Host") == PUBLIC_ORIGIN.netloc)
+        return (f"{COOKIE_NAME}={token}; Path=/; HttpOnly; SameSite=Strict; "
+                f"Max-Age={lifetime}" + ("; Secure" if secure else ""))
 
     def _require_login(self):
         if self._authorized():
             return False
-        data = "Anmeldung erforderlich.".encode("utf-8")
-        self.send_response(401)
-        self.send_header("WWW-Authenticate", 'Basic realm="JARVIS", charset="UTF-8"')
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+        return self._json({"error": "Anmeldung erforderlich.", "login": "/login"}, 401) is None
+
+    def _redirect(self, path):
+        self.send_response(303)
+        self.send_header("Location", path)
+        self.send_header("Content-Length", "0")
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+
+    def _login(self):
+        if self.headers.get("Content-Type", "").split(";", 1)[0].lower() != "application/json":
+            return self._json({"error": "JSON erforderlich."}, 415)
+        try:
+            form = json.loads(self._read(4096))
+            supplied = form.get("password")
+            if not isinstance(supplied, str) or len(supplied) > 256:
+                return self._json({"error": "Bitte das Zugangspasswort eingeben."}, 400)
+        except (ValueError, TypeError, json.JSONDecodeError):
+            return self._json({"error": "Ungültige Anmeldung."}, 400)
+
+        ip = self.client_address[0]
+        now = time.monotonic()
+        with LOGIN_LOCK:
+            attempts, since = LOGIN_ATTEMPTS.get(ip, (0, now))
+            if now - since > 300:
+                attempts, since = 0, now
+            if attempts >= 8:
+                return self._json({"error": "Zu viele Versuche. Bitte später erneut anmelden."}, 429)
+            correct = bool(ACCESS_PASSWORD) and secrets.compare_digest(supplied, ACCESS_PASSWORD)
+            if not correct:
+                LOGIN_ATTEMPTS[ip] = (attempts + 1, since)
+                return self._json({"error": "Das Zugangspasswort ist nicht richtig."}, 401)
+            LOGIN_ATTEMPTS.pop(ip, None)
+
+        expiry = int(time.time()) + COOKIE_LIFETIME
+        token = f"{expiry}.{self._session_signature(expiry)}"
+        data = b'{"ok":true}'
+        self.send_response(200)
+        self.send_header("Set-Cookie", self._cookie_header(token, COOKIE_LIFETIME))
+        self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(data)))
         self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(data)
-        return True
 
     def _token_ok(self):
         supplied = self.headers.get("X-Jarvis-Token", "")
@@ -156,9 +218,14 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         if not self._host_ok():
             return self._json({"error": "Ungültiger Hostname."}, 403)
-        if self._require_login():
-            return
         p = urlparse(self.path).path
+        if p == "/login" and self._authorized():
+            return self._redirect("/")
+        public_assets = {"/login", "/login.css", "/login.js"}
+        if not self._authorized() and p not in public_assets:
+            if p == "/" or p == "/index.html":
+                return self._redirect("/login")
+            return self._json({"error": "Anmeldung erforderlich."}, 401)
         if p == "/api/status":
             return self._json(dict(
                 runtime=runtime.runtime_kind(),
@@ -183,9 +250,9 @@ class Handler(BaseHTTPRequestHandler):
                                    running=[j for j in commands.jobs_snapshot()
                                             if j["status"] == "running"]))
 
-        rel = "index.html" if p == "/" else p.lstrip("/")
+        rel = "login.html" if p == "/login" else ("index.html" if p == "/" else p.lstrip("/"))
         f = (UI / rel).resolve()
-        if not str(f).startswith(str(UI.resolve())) or not f.is_file():
+        if not f.is_relative_to(UI.resolve()) or not f.is_file():
             return self._bytes("Nicht gefunden".encode("utf-8"), "text/plain; charset=utf-8", 404)
         ctype = mimetypes.guess_type(f.name)[0] or "application/octet-stream"
         data = f.read_bytes()
@@ -198,12 +265,14 @@ class Handler(BaseHTTPRequestHandler):
         p = urlparse(self.path).path
         if not self._host_ok() or not self._origin_ok():
             return self._json({"error": "Anfrageursprung abgewiesen."}, 403)
+        if p == "/api/login":
+            return self._login()
         if self._require_login():
             return
         if not self._token_ok():
             return self._json({"error": "unauthorized"}, 401)
         ctype = self.headers.get("Content-Type", "").split(";", 1)[0].lower()
-        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel"} and ctype != "application/json":
+        if p in {"/api/run", "/api/speak", "/api/new", "/api/cancel", "/api/logout"} and ctype != "application/json":
             return self._json({"error": "JSON-Daten werden benötigt."}, 415)
         if p == "/api/listen" and not ctype.startswith("audio/"):
             return self._json({"error": "Eine Audioaufnahme wird benötigt."}, 415)
@@ -211,6 +280,14 @@ class Handler(BaseHTTPRequestHandler):
             raw = self._read(MAX_AUDIO_BODY if p == "/api/listen" else MAX_JSON_BODY)
         except (TypeError, ValueError):
             return self._json({"error": "Die Anfrage ist zu groß."}, 413)
+
+        if p == "/api/logout":
+            self.send_response(204)
+            self.send_header("Set-Cookie", self._cookie_header("", 0))
+            self.send_header("Content-Length", "0")
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            return
 
         if p == "/api/speak":
             try:
@@ -333,7 +410,7 @@ def main():
   Sprachmodus:    {voice_name}
   Zugang:         {PUBLIC_URL}
   Bind-Adresse:   {BIND}
-  Zugriffsschutz: {"Passwort" if ACCESS_PASSWORD else "nur localhost"}
+  Zugriffsschutz: {"Geräteanmeldung" if ACCESS_PASSWORD else "nur localhost"}
 """, flush=True)
 
     srv = ThreadingHTTPServer((BIND, PORT), Handler)
