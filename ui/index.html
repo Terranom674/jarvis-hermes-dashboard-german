@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="jarvis-token" content="__JARVIS_TOKEN__">
-<title>JARVIS · Hermes Mission Control</title>
+<title>JARVIS · Hermes-Kommandozentrale</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -36,14 +36,14 @@
     </header>
 
     <div class="cmds" id="cmds">
-      <button class="cmd" data-cmd="/new"><b>/new</b><span>Neues Gespräch</span></button>
-      <button class="cmd" data-cmd="/goal"><b>/goal</b><span>Dauerhaftes Ziel</span></button>
-      <button class="cmd" data-cmd="/tools"><b>/tools</b><span>Hermes-Werkzeuge</span></button>
+      <button class="cmd" data-cmd="/neu"><b>/neu</b><span>Neues Gespräch</span></button>
+      <button class="cmd" data-cmd="/ziel"><b>/ziel</b><span>Dauerhaftes Ziel</span></button>
+      <button class="cmd" data-cmd="/werkzeuge"><b>/werkzeuge</b><span>Hermes-Werkzeuge</span></button>
       <button class="cmd" data-cmd="/browser"><b>/browser</b><span>Browser-Aufgabe</span></button>
-      <button class="cmd" data-cmd="/background"><b>/background</b><span>Hintergrundauftrag</span></button>
-      <button class="cmd" data-cmd="/mission"><b>/mission</b><span>Auftragsliste</span></button>
-      <button class="cmd" data-cmd="/personality"><b>/personality</b><span>Tonfall ändern</span></button>
-      <button class="cmd" data-cmd="/commands"><b>/commands</b><span>Befehle anzeigen</span></button>
+      <button class="cmd" data-cmd="/hintergrund"><b>/hintergrund</b><span>Hintergrundauftrag</span></button>
+      <button class="cmd" data-cmd="/auftrag"><b>/auftrag</b><span>Auftragsliste</span></button>
+      <button class="cmd" data-cmd="/tonfall"><b>/tonfall</b><span>Tonfall ändern</span></button>
+      <button class="cmd" data-cmd="/befehle"><b>/befehle</b><span>Befehle anzeigen</span></button>
     </div>
 
     <div class="toolrack">
@@ -62,7 +62,7 @@
 
   <section class="col center">
     <div class="reactor" id="reactor">
-      <svg viewBox="0 0 520 520" id="core" aria-label="JARVIS reactor visualizer">
+      <svg viewBox="0 0 520 520" id="core" aria-label="Animierter JARVIS-Reaktorkern">
         <defs>
           <radialGradient id="orb" cx="50%" cy="45%" r="55%">
             <stop offset="0%" stop-color="#ffffff"/><stop offset="25%" stop-color="#7ff7ff"/>
@@ -123,9 +123,9 @@
       <div class="log-lbl">Schnellzugriff</div>
       <div class="miniBtns">
         <button data-quick="/status">Status</button>
-        <button data-quick="/tools">Werkzeuge</button>
-        <button data-quick="/toolsets">Werkzeugsätze</button>
-        <button data-quick="/connectors">Verbindungen</button>
+        <button data-quick="/werkzeuge">Werkzeuge</button>
+        <button data-quick="/werkzeugsaetze">Werkzeugsätze</button>
+        <button data-quick="/verbindungen">Verbindungen</button>
       </div>
     </div>
 
@@ -134,7 +134,7 @@
   </section>
 </div>
 
-<div class="brandmark">HERMES · JARVIS OS</div>
+<div class="brandmark">HERMES · JARVIS ZENTRALE</div>
 <script src="app.js"></script>
 </body>
 </html>
