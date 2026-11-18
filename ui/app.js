@@ -1,7 +1,7 @@
-/* JARVIS Live HUD — drives Hermes Agent, streams telemetry.
+/* JARVIS-Kommandozentrale: Oberfläche für den vorhandenen Hermes Agent.
 
-   The brain is your own `hermes` CLI/profile, so configured Hermes tools,
-   browser automation, skills, memory, MCP servers and third-party connectors are live. */
+   Das bereits eingerichtete Hermes-Profil stellt Modell, Gedächtnis, Skills,
+   Browserwerkzeuge und MCP-Verbindungen bereit. */
 const $ = s => document.querySelector(s);
 const RT = {tts:false, stt:false, provider:'browser', browserStt:false, browserTts:false};
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -61,7 +61,7 @@ let speakDone = Promise.resolve(), activeController = null;
 async function transmit(message, options = {}){
   if (!message.trim()) return;
   if (running){
-    // don't silently swallow it — say so, so it never looks like nothing happened
+    // Eine bereits laufende Anfrage sichtbar melden.
     log('note','BESETZT',`Jarvis arbeitet noch – "${message.slice(0,40)}" wurde nicht gesendet. Esc zum Abbrechen.`);
     return;
   }
@@ -74,7 +74,7 @@ async function transmit(message, options = {}){
   $('#response').innerHTML = '<span class="cur"></span>';
   log('run', 'START', `Anfrage ${id} gestartet`);
 
-  // visible elapsed counter — a slow answer should never look like a dead screen
+  // Laufzeit anzeigen, damit Wartezeiten nicht wie ein Absturz aussehen.
   const t0 = performance.now();
   const tick = setInterval(() => {
     if (!running) return;
@@ -117,7 +117,7 @@ async function transmit(message, options = {}){
   activeController = null;
   running = false;
   clearInterval(tick);
-  await speakDone;                 // don't return until Jarvis has finished talking
+  await speakDone;                 // Erst zurückkehren, wenn die Antwort gesprochen ist.
 }
 
 function handle(ev){
@@ -158,7 +158,7 @@ function handle(ev){
       setState('error', 'FEHLER', ev.message?.slice(0,40) || 'Fehler');
       setTag('err', 'FEHLER');
       log('error', 'FEHLER', ev.message || 'Unbekannter Fehler');
-      // show it in the panel too, so a failure isn't a silent empty box
+      // Fehler zusätzlich im Antwortfeld anzeigen.
       if (!answer) $('#response').innerHTML =
         `<span style="color:var(--red)">⚠ ${esc(ev.message || 'Auftrag fehlgeschlagen.')}</span>`;
       else renderAnswer(true);
@@ -188,14 +188,13 @@ function cleanForSpeech(text){
     .trim();
 }
 
-/* ══════════ continuous voice conversation ══════════
-   Click VOICE once. From then on: listen → you stop → transcribe → Jarvis
-   answers and speaks → it listens again, automatically. No re-clicking between
-   turns. Click VOICE again (or press Esc) to end the conversation.
+/* ══════════ Durchgehendes Sprachgespräch ══════════
+   Einmal auf den Sprachknopf klicken: zuhören → Aufnahmeende → Transkription →
+   Antwort → Sprachausgabe → wieder zuhören. Ein erneuter Klick beendet das
+   Gespräch; Escape kann es ebenfalls beenden.
 
-   The mic is deliberately DEAF while Jarvis is thinking or speaking (`suppress`)
-   — otherwise it transcribes his own voice through the speakers and talks to
-   itself forever. That's why re-arming happens only after he finishes. */
+   Während Jarvis antwortet, ist das Mikrofon absichtlich stumm (`suppress`).
+   Andernfalls würde die eigene Sprachausgabe erneut erkannt. */
 let convo = false, suppress = false;
 let recognition = null;
 let micStream=null, recorder=null, chunks=[], actx=null, analyser=null, vdata=null;
@@ -252,9 +251,9 @@ function speak(text){
 // ── Sprachgespräch starten und beenden ──
 async function micToggle(){
   if (convo){ stopConvo(); return; }
-  // Prefer ElevenLabs server-side STT when configured. Browser STT is unreliable
-  // across Chrome profiles and often fails silently; ElevenLabs receives the
-  // actual microphone recording from MediaRecorder and is much more consistent.
+  // Vorhandene Hermes-Spracherkennung bevorzugen. Falls ausdrücklich gewählt,
+  // ist auch der optionale ElevenLabs-Dienst möglich. Die Browser-Erkennung
+  // dient als kostenloser Ausweichweg.
   if (RT.stt){
     if (!window.MediaRecorder || !navigator.mediaDevices?.getUserMedia){
       log('error','SPRACHE','Dieser Browser unterstützt keine sichere Mikrofonaufnahme. HTTPS oder localhost prüfen.');
@@ -384,7 +383,7 @@ function vtick(){
   peak = Math.max(peak, rms);
   meter(rms);
 
-  // first 300ms: measure the room's noise floor, set a threshold just above it
+  // In den ersten 300 ms Umgebungsgeräusche messen und Schwellwert festlegen.
   if (calibrating){
     floorSum += rms; floorN++;
     if (t - turnStart > 300){
@@ -402,7 +401,7 @@ function vtick(){
     return endTurn('Sprechpause');
   }
 
-  // failsafes so it can never hang: cap the length, re-listen if no speech at all
+  // Schutz gegen Endlosaufnahmen bei Stille oder zu langen Wortmeldungen.
   if (t - turnStart > MAX_TURN_MS) return endTurn('maximale Aufnahmelänge');
   if (!spoke && t - turnStart > NO_SPEECH_MS) return endTurn('keine Sprache');
 }
@@ -411,7 +410,7 @@ async function ship(){
   const cancel = recorder?._cancel;
   const blob = new Blob(chunks, {type: recorder?.mimeType || 'audio/webm'}); chunks=[];
   if (cancel){ return; }
-  // no speech heard, too short, or too small — just listen again, don't ship ambient noise
+  // Stille und zu kurze Aufnahmen nicht zur Spracherkennung übertragen.
   if (!spoke || blob.size < 1400 || performance.now()-turnStart < MIN_TURN_MS){
     if (convo && !suppress) beginTurn();
     return;
@@ -461,9 +460,8 @@ $('#cmds').addEventListener('click', e => {
     return;
   }
 
-  // Every matrix button executes its base command immediately. Commands that
-  // accept an argument remain armed afterwards so the next typed or spoken
-  // payload is sent as `/command payload`.
+  // Befehle werden direkt ausgeführt. Bei Befehlen mit Argumenten
+  // bleibt die nächste gesprochene oder getippte Eingabe zugeordnet.
   disarm();
   if (PAYLOAD_COMMANDS.has(cmd)){
     b.classList.add('armed');
