@@ -124,7 +124,7 @@ function handle(ev){
   switch (ev.t){
     case 'status':
       if (ev.session_id) sys('session', ev.session_id.slice(0,8));
-        const msg = `Hermes verbunden · Werkzeuge: ${ev.tools ?? 0} · Profil: ${ev.profile||'Standard'} · Berechtigung: ${ev.permission||'normal'}`;
+        const msg = `Hermes verbunden · Werkzeuge: ${ev.tools ?? 0} · Profil: ${ev.profile||'Standard'} · Rechte durch Hermes verwaltet`;
       log('status', 'STATUS', msg);
       break;
     case 'latency':
@@ -568,7 +568,7 @@ setInterval(async () => {
     $('#toolsList').innerHTML = tools.length ? tools.map(t => `<span class="chip">${esc(t)}</span>`).join('') : '<span class="chip ghost">Hermes-Werkzeuge nicht abrufbar – HERMES_CMD prüfen</span>';
 
     log('status', 'START',
-        `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigung: ${s.permission}`);
+        `Verbindung hergestellt · KI: ${s.runtime} · Profil: ${s.profile || 'Standard'} · Berechtigungen gemäß Hermes-Profil`);
     log('voice', 'SPRACHE', `Sprachkanal bereit – Eingabe: ${label(s.stt)}, Ausgabe: ${label(s.tts)}`);
     $('#mic').textContent = s.stt === 'hermes' ? '◉ Hermes-Sprachdialog' : (s.stt === 'elevenlabs' ? '◉ ElevenLabs-Sprachdialog' : '◉ Browser-Sprachdialog');
     setState('', 'BEREIT', 'warte auf Eingabe');
