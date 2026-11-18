@@ -38,7 +38,7 @@ def _run(action, payload, timeout):
     if not available():
         raise RuntimeError("Hermes-Sprachumgebung nicht gefunden. JARVIS_HERMES_SOURCE pruefen.")
     # No shell interpolation: speech text is sent over stdin, never shell arguments.
-    command = ["bash", str(launcher()), "python", str(WORKER), action]
+    command = ["bash", str(launcher()), "python3", str(WORKER), action]
     try:
         proc = subprocess.run(
             command, cwd=str(source_dir()), input=payload, text=True,
