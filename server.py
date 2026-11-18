@@ -165,7 +165,8 @@ class Handler(BaseHTTPRequestHandler):
     def _require_login(self):
         if self._authorized():
             return False
-        return self._json({"error": "Anmeldung erforderlich.", "login": "/login"}, 401) is None
+        self._json({"error": "Anmeldung erforderlich.", "login": "/login"}, 401)
+        return True
 
     def _redirect(self, path):
         self.send_response(303)
