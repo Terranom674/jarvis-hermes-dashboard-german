@@ -150,24 +150,24 @@ def _shell(cmd, timeout=25):
 
 
 def _commands_reply():
-    return """Available dashboard slash commands:
-/new — reset the Hermes thread
-/goal <text|status|clear> — set/read/clear standing objective
-/profile <fact> — add a local profile note injected into Hermes prompts
-/personality <tone> — set Jarvis tone overlay
-/kanban [task] — read/add mission queue item
-/mission [task] — alias for /kanban
-/background <mission> — run a Hermes mission asynchronously
-/tools — show Hermes tool status from `hermes tools list`
-/connectors — explain that connected Hermes tools transfer into this dashboard
-/connect <name> — ask Hermes how to connect a third-party app generally
-/toolsets — ask Hermes to list available toolsets
-/status — local Hermes runtime/profile/status
-/browser <task> — ask Hermes to use browser/Chrome tools
-/clear — clear the response panel locally
-/help or /commands — show this list
+    return """Verfügbare JARVIS-Kurzbefehle:
+/new — neues Hermes-Gespräch starten
+/goal <text|status|clear> — dauerhaftes Ziel setzen, anzeigen oder löschen
+/profile <info> — lokale Profilnotiz speichern
+/personality <tonfall> — Tonfall anpassen
+/kanban [aufgabe] — Auftragsliste anzeigen oder Aufgabe hinzufügen
+/mission [aufgabe] — wie /kanban
+/background <auftrag> — Hermes-Auftrag im Hintergrund ausführen
+/tools — Hermes-Werkzeuge anzeigen
+/connectors — Informationen zu Hermes-Verbindungen
+/connect <name> — Hilfe für eine externe Hermes-Verbindung
+/toolsets — verfügbare Werkzeugsätze abfragen
+/status — Status des Dashboards
+/browser <auftrag> — Browser-Auftrag an Hermes übergeben
+/clear — Antwortbereich leeren
+/help oder /commands — diese Übersicht anzeigen
 
-You can also type normal Hermes prompts. Unknown slash commands are forwarded to Hermes."""
+Freier Text und unbekannte /-Befehle werden an Hermes weitergegeben."""
 
 
 def handle(message, runner=None):
